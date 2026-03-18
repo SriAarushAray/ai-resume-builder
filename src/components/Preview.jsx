@@ -1,12 +1,13 @@
-import React, { useRef, useState, useLayoutEffect } from "react";
+import React, { useRef } from "react";
+import html2pdf from "html2pdf.js";
 
 function Preview({ resumeData }) {
   const containerRef = useRef(null);
-  const [breakIndexes, setBreakIndexes] = useState([]);
 
   const {
     personal = {},
     skills = [],
+    groupedSkills = [],
     education = {},
     projects = [],
     achievements = [],
@@ -17,7 +18,7 @@ function Preview({ resumeData }) {
 
   // 🔹 PERSONAL
   sections.push(
-    <section key="personal" className="section">
+    <section key="personal">
       <h1 className="text-2xl font-bold">
         {personal.fullName || "Your Name"}
       </h1>
@@ -32,22 +33,38 @@ function Preview({ resumeData }) {
   // 🔹 SUMMARY
   if (personal.summary) {
     sections.push(
-      <section key="summary" className="section">
-        <h3 className="heading">Professional Summary</h3>
+      <section key="summary">
+        <h3 className="font-semibold border-b pb-1 mt-4">
+          Professional Summary
+        </h3>
         <p className="text-sm mt-1">{personal.summary}</p>
       </section>
     );
   }
 
-  // 🔹 SKILLS
+  // 🔹 SKILLS (GROUPED + FALLBACK)
   if (skills.length > 0) {
     sections.push(
-      <section key="skills" className="section">
-        <h3 className="heading">Skills</h3>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {skills.map((s, i) => (
-            <span key={i} className="tag">{s}</span>
-          ))}
+      <section key="skills">
+        <h3 className="font-semibold border-b pb-1 mt-4">
+          Skills
+        </h3>
+
+        <div className="mt-2 space-y-1">
+          {groupedSkills && groupedSkills.length > 0 ? (
+            groupedSkills.map((group, i) => (
+              <p key={i} className="text-sm">
+                <span className="font-medium">
+                  {group.category}:{" "}
+                </span>
+                {group.items.join(", ")}
+              </p>
+            ))
+          ) : (
+            <p className="text-sm">
+              {skills.join(", ")}
+            </p>
+          )}
         </div>
       </section>
     );
@@ -56,8 +73,10 @@ function Preview({ resumeData }) {
   // 🔹 EDUCATION
   if (education.college) {
     sections.push(
-      <section key="education" className="section">
-        <h3 className="heading">Education</h3>
+      <section key="education">
+        <h3 className="font-semibold border-b pb-1 mt-4">
+          Education
+        </h3>
         <p className="font-medium">
           {education.degree} – {education.college}
         </p>
@@ -69,17 +88,19 @@ function Preview({ resumeData }) {
     );
   }
 
-  // 🔥 PROJECTS (split per item)
+  // 🔥 PROJECTS
   if (projects.length > 0) {
     sections.push(
-      <section key="projects-heading" className="section">
-        <h3 className="heading">Projects</h3>
+      <section key="projects-heading">
+        <h3 className="font-semibold border-b pb-1 mt-4">
+          Projects
+        </h3>
       </section>
     );
 
     projects.forEach((p, i) => {
       sections.push(
-        <section key={`project-${i}`} className="section">
+        <section key={`project-${i}`}>
           <p className="font-semibold">{p.title}</p>
           {p.description && (
             <p className="text-sm">{p.description}</p>
@@ -94,17 +115,19 @@ function Preview({ resumeData }) {
     });
   }
 
-  // 🔥 ACHIEVEMENTS (split per item)
+  // 🔥 ACHIEVEMENTS
   if (achievements.length > 0) {
     sections.push(
-      <section key="achievements-heading" className="section">
-        <h3 className="heading">Achievements</h3>
+      <section key="achievements-heading">
+        <h3 className="font-semibold border-b pb-1 mt-4">
+          Achievements
+        </h3>
       </section>
     );
 
     achievements.forEach((a, i) => {
       sections.push(
-        <section key={`achievement-${i}`} className="section">
+        <section key={`achievement-${i}`}>
           <p className="font-medium">• {a.title}</p>
           {a.description && (
             <p className="text-sm text-gray-600 ml-3">
@@ -116,18 +139,38 @@ function Preview({ resumeData }) {
     });
   }
 
-  // 🔥 CERTIFICATES (split per item)
-  if (certificates.length > 0) {
+  // 🔥 CERTIFICATES (FIXED + LINK IN NAME)
+  const validCertificates = certificates.filter(
+    (c) => c.name || c.issuer || c.year || c.link
+  );
+
+  if (validCertificates.length > 0) {
     sections.push(
-      <section key="certificates-heading" className="section">
-        <h3 className="heading">Certificates</h3>
+      <section key="certificates-heading">
+        <h3 className="font-semibold border-b pb-1 mt-4">
+          Certificates
+        </h3>
       </section>
     );
 
-    certificates.forEach((c, i) => {
+    validCertificates.forEach((c, i) => {
       sections.push(
-        <section key={`certificate-${i}`} className="section">
-          <p className="font-medium">{c.name}</p>
+        <section key={`certificate-${i}`}>
+          {/* NAME AS LINK */}
+          {c.link ? (
+            <a
+              href={c.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-blue-600 hover:underline"
+            >
+              {c.name}
+            </a>
+          ) : (
+            <p className="font-medium">{c.name}</p>
+          )}
+
+          {/* ISSUER + YEAR */}
           {(c.issuer || c.year) && (
             <p className="text-sm text-gray-600">
               {c.issuer}
@@ -140,47 +183,47 @@ function Preview({ resumeData }) {
     });
   }
 
-  // 🔥 PAGE BREAK LOGIC
-  useLayoutEffect(() => {
-    if (!containerRef.current) return;
+  // 🔥 DOWNLOAD PDF
+  const handleDownload = () => {
+    const element = containerRef.current;
 
-    requestAnimationFrame(() => {
-      const A4_HEIGHT = 1123;
+    const opt = {
+      margin: 0,
+      filename: "resume.pdf",
+      html2canvas: { scale: 2, scrollY: 0 },
+      pagebreak: { mode: ["css"] },
+      jsPDF: {
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+      },
+    };
 
-      const sectionNodes = Array.from(
-        containerRef.current.querySelectorAll(".section")
-      );
-
-      let currentHeight = 0;
-      const newBreaks = [];
-
-      sectionNodes.forEach((section, index) => {
-        const height = section.getBoundingClientRect().height;
-
-        if (currentHeight + height > A4_HEIGHT) {
-          newBreaks.push(index);
-          currentHeight = 0;
-        }
-
-        currentHeight += height;
-      });
-
-      setBreakIndexes(newBreaks);
-    });
-  }, [resumeData]);
+    html2pdf().set(opt).from(element).save();
+  };
 
   return (
-    <div className="preview-container">
-      <div className="doc-page" ref={containerRef}>
-        {sections.map((section, index) => (
-          <React.Fragment key={index}>
-            {breakIndexes.includes(index) && (
-              <div className="page-break">Page Break</div>
-            )}
-            {section}
-          </React.Fragment>
-        ))}
+    <div className="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
+
+      {/* PREVIEW */}
+      <div ref={containerRef}>
+        <div className="w-[794px] min-h-[1123px] bg-white p-6 shadow-lg">
+          {sections.map((section, index) => (
+            <div key={index} className="mb-3 break-inside-avoid">
+              {section}
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* BUTTON */}
+      <button
+        onClick={handleDownload}
+        className="mt-6 px-4 py-2 bg-blue-500 text-white rounded"
+      >
+        Download PDF
+      </button>
+
     </div>
   );
 }

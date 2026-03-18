@@ -1,0 +1,96 @@
+login page
+linked in login
+make it dark blue ball shaped login 
+
+
+# 🤖 AI FEATURES ROADMAP — Resume Builder
+
+## 🎯 Goal
+
+
+## ✅ Phase 1 — Core AI Integration (Skills)
+
+### Feature: Auto Group Skills 
+### suggest similar skills
+
+* Input: Array of skills (["React", "Node", "Python"])
+* Output:
+  [
+  { category: "Frontend", items: ["React"] },
+  { category: "Backend", items: ["Node"] },
+  { category: "Languages", items: ["Python"] }
+  ]
+
+### Requirements:
+
+* Keep original `skills` unchanged
+* Store AI result in `groupedSkills`
+* Add toggle:
+
+  * Raw view
+  * Grouped view
+
+---
+
+## ⚙️ Phase 2 — AI Resume Enhancement
+
+### Features:
+
+* Improve summary
+* Suggest better bullet points (projects/achievements)
+* Keyword optimization for ATS
+
+---
+
+## 🧠 Phase 3 — Smart Suggestions
+
+### Features:
+
+* Suggest missing skills
+* Suggest project descriptions
+* Suggest certifications
+
+---
+
+## 🚀 Phase 4 — Advanced
+
+### Features:
+
+* Resume scoring system
+* Job description matching
+* Auto resume tailoring
+
+---
+
+## ⚠️ Rules
+
+* AI should NEVER overwrite user data directly
+* Always allow user control (edit / revert)
+* Keep AI optional (not forced)
+
+---
+
+## 🧩 Tech Plan
+
+Frontend:
+
+* Button: "Auto Group Skills"
+* Toggle UI
+
+Backend:
+
+* Node.js API route
+* OpenAI API call
+
+---
+
+## 📌 Status
+
+* UI ready ✅
+* Data structure ready ✅
+* AI integration ❌ (pending)
+
+
+##job matching 
+## it should give list of collages and schools across world if a letter is given 
+## 
