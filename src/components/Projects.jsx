@@ -1,21 +1,78 @@
 import React from "react";
 
 function Projects({ resumeData, setResumeData }) {
+  const projects = resumeData.projects || [];
+
   // Add new empty project
   const handleAddProject = () => {
     setResumeData({
       ...resumeData,
       projects: [
-        ...resumeData.projects,
-        { title: "", description: "", technologies: "" },
+        ...projects,
+        { title: "", technologies: "", points: [] },
       ],
     });
   };
 
   // Update project while typing
   const updateProject = (index, field, value) => {
-    const updatedProjects = [...resumeData.projects];
-    updatedProjects[index][field] = value;
+    const updatedProjects = [...projects];
+    updatedProjects[index] = {
+      ...updatedProjects[index],
+      [field]: value,
+    };
+
+    setResumeData({
+      ...resumeData,
+      projects: updatedProjects,
+    });
+  };
+
+  const addProjectPoint = (projectIndex) => {
+    const updatedProjects = [...projects];
+    const currentPoints = Array.isArray(updatedProjects[projectIndex]?.points)
+      ? updatedProjects[projectIndex].points
+      : [];
+
+    updatedProjects[projectIndex] = {
+      ...updatedProjects[projectIndex],
+      points: [...currentPoints, ""],
+    };
+
+    setResumeData({
+      ...resumeData,
+      projects: updatedProjects,
+    });
+  };
+
+  const updateProjectPoint = (projectIndex, pointIndex, value) => {
+    const updatedProjects = [...projects];
+    const currentPoints = Array.isArray(updatedProjects[projectIndex]?.points)
+      ? [...updatedProjects[projectIndex].points]
+      : [];
+    currentPoints[pointIndex] = value;
+
+    updatedProjects[projectIndex] = {
+      ...updatedProjects[projectIndex],
+      points: currentPoints,
+    };
+
+    setResumeData({
+      ...resumeData,
+      projects: updatedProjects,
+    });
+  };
+
+  const removeProjectPoint = (projectIndex, pointIndexToRemove) => {
+    const updatedProjects = [...projects];
+    const currentPoints = Array.isArray(updatedProjects[projectIndex]?.points)
+      ? updatedProjects[projectIndex].points
+      : [];
+
+    updatedProjects[projectIndex] = {
+      ...updatedProjects[projectIndex],
+      points: currentPoints.filter((_, pointIndex) => pointIndex !== pointIndexToRemove),
+    };
 
     setResumeData({
       ...resumeData,
@@ -27,7 +84,7 @@ function Projects({ resumeData, setResumeData }) {
   const handleRemoveProject = (indexToRemove) => {
     setResumeData({
       ...resumeData,
-      projects: resumeData.projects.filter(
+      projects: projects.filter(
         (_, index) => index !== indexToRemove,
       ),
     });
@@ -39,22 +96,13 @@ function Projects({ resumeData, setResumeData }) {
 
       {/* Project Blocks */}
       <div className="space-y-4">
-        {resumeData.projects.map((project, index) => (
+        {projects.map((project, index) => (
           <div key={index} className="border p-3 mb-3 rounded">
             <input
               type="text"
               placeholder="Project Title"
               value={project.title}
               onChange={(e) => updateProject(index, "title", e.target.value)}
-              className="w-full border p-2 mb-2 rounded"
-            />
-
-            <textarea
-              placeholder="Project Description"
-              value={project.description}
-              onChange={(e) =>
-                updateProject(index, "description", e.target.value)
-              }
               className="w-full border p-2 mb-2 rounded"
             />
 
@@ -68,6 +116,37 @@ function Projects({ resumeData, setResumeData }) {
               className="w-full border p-2 mb-2 rounded"
             />
 
+            <div className="mb-3">
+              <p className="text-sm font-medium mb-2">Project Points</p>
+
+              {(project.points || []).map((point, pointIndex) => (
+                <div key={pointIndex} className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    placeholder={`Point ${pointIndex + 1}`}
+                    value={point}
+                    onChange={(e) => updateProjectPoint(index, pointIndex, e.target.value)}
+                    className="w-full border p-2 rounded"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeProjectPoint(index, pointIndex)}
+                    className="text-red-500 px-2"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => addProjectPoint(index)}
+                className="text-blue-600 text-sm"
+              >
+                + Add Point
+              </button>
+            </div>
+
             <button
               onClick={() => handleRemoveProject(index)}
               className="text-red-500"
@@ -76,27 +155,6 @@ function Projects({ resumeData, setResumeData }) {
             </button>
           </div>
         ))}
-        {resumeData.projects.length > 0 && (
-          <div className="mt-6">
-            <h3 className="font-semibold text-lg border-b pb-1">Projects</h3>
-
-            {resumeData.projects.map((project, index) => (
-              <div key={index} className="mt-3">
-                <p className="font-semibold">{project.title}</p>
-
-                {project.description && (
-                  <p className="text-sm text-gray-700">{project.description}</p>
-                )}
-
-                {project.technologies && (
-                  <p className="text-sm text-gray-500">
-                    Technologies: {project.technologies}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Add Button */}

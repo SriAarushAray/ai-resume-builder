@@ -3,6 +3,7 @@ import Preview from "../components/Preview";
 import Personal from "../components/Personal";
 import Skills from "../components/Skills";
 import Education from "../components/Education";
+import Experience from "../components/Experience";
 import Projects from "../components/Projects";
 import Achievements from "../components/Achievements";
 import Certificates   from "../components/Certificates";
@@ -32,11 +33,12 @@ function ResumeBuilder() {
             year: "",
             gpa: "",
           },
+          experiences: [],
           projects: [
             {
               title: "",
-              description: "",
               technologies: "",
+              points: [],
             }
           ],
           achievements: [],
@@ -90,6 +92,7 @@ function ResumeBuilder() {
           <Personal resumeData={resumeData} setResumeData={setResumeData} />
           <Skills resumeData={resumeData} setResumeData={setResumeData} />
           <Education resumeData={resumeData} setResumeData={setResumeData} />
+          <Experience resumeData={resumeData} setResumeData={setResumeData} />
           <Projects resumeData={resumeData} setResumeData={setResumeData} />
           <Achievements resumeData={resumeData} setResumeData={setResumeData} />
           <Certificates resumeData={resumeData} setResumeData={setResumeData} />
