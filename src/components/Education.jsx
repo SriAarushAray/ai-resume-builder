@@ -1,4 +1,5 @@
 import { useState } from "react";
+import MonthYearPicker from "./MonthYearPicker";
 
 function Education({ resumeData, setResumeData }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -135,12 +136,11 @@ function Education({ resumeData, setResumeData }) {
             Graduation Year
           </label>
 
-          <input
-            name="year"
+          <MonthYearPicker
             value={resumeData.education.year}
-            onChange={handleChange}
-            placeholder="Enter graduation year"
-            className="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(v) => handleChange({ target: { name: "year", value: v } })}
+            placeholder="Select year"
+            yearOnly
           />
         </div>
 

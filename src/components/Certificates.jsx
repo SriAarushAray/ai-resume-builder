@@ -1,3 +1,4 @@
+import MonthYearPicker from "./MonthYearPicker";
 
 function Certificates({ resumeData, setResumeData }) {
 
@@ -62,14 +63,11 @@ function Certificates({ resumeData, setResumeData }) {
             className="w-full border p-2 mb-2 rounded"
           />
 
-          <input
-            type="text"
-            placeholder="Year"
+          <MonthYearPicker
             value={cert.year}
-            onChange={(e) =>
-              updateCertificate(index, "year", e.target.value)
-            }
-            className="w-full border p-2 mb-2 rounded"
+            onChange={(v) => updateCertificate(index, "year", v)}
+            placeholder="Select year"
+            yearOnly
           />
 
           <input

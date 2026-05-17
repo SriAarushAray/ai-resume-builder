@@ -8,7 +8,7 @@ const A4_HEIGHT_PX = A4_HEIGHT_MM * PX_PER_MM;
 const PAGE_PADDING_PX = 24;
 const PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_PX - PAGE_PADDING_PX * 2;
 
-function Preview({ resumeData }) {
+function Preview({ resumeData, resumeName }) {
   const containerRef = useRef(null);
   const blockRefs = useRef([]);
   const [paginatedBlockIndexes, setPaginatedBlockIndexes] = useState([]);
@@ -21,6 +21,8 @@ function Preview({ resumeData }) {
     projects = [],
     achievements = [],
     certificates = [],
+    publications = [],
+    responsibilities = [],
   } = resumeData || {};
 
   const contentBlocks = useMemo(() => {
@@ -48,6 +50,12 @@ function Preview({ resumeData }) {
         certificate?.issuer?.trim() ||
         certificate?.year?.trim() ||
         certificate?.link?.trim(),
+    );
+    const filteredPublications = publications.filter(
+      (pub) => pub?.title?.trim() || pub?.date?.trim() || pub?.description?.trim(),
+    );
+    const filteredResponsibilities = responsibilities.filter(
+      (resp) => resp?.role?.trim() || resp?.organization?.trim() || resp?.description?.trim(),
     );
 
     blocks.push({
@@ -232,8 +240,60 @@ function Preview({ resumeData }) {
       });
     }
 
+    if (filteredPublications.length > 0) {
+      filteredPublications.forEach((pub, index) => {
+        blocks.push({
+          key: `publication-${index}`,
+          keepTogether: true,
+          node: (
+            <section className="mb-4 break-inside-avoid keep-together">
+              {index === 0 && <h3 className="font-semibold border-b pb-1 mb-2 uppercase tracking-wide text-sm">Publications</h3>}
+              <div className="mb-2">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-bold text-sm">{pub.title}</p>
+                  {pub.date && (
+                    <p className="text-sm text-gray-600 text-right whitespace-nowrap">{pub.date}</p>
+                  )}
+                </div>
+                {pub.description && (
+                  <div className="text-sm text-gray-800 mt-1 pl-4 flex">
+                    <span className="mr-2 inline-block">•</span>
+                    <span>{pub.description}</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          ),
+        });
+      });
+    }
+
+    if (filteredResponsibilities.length > 0) {
+      filteredResponsibilities.forEach((resp, index) => {
+        blocks.push({
+          key: `responsibility-${index}`,
+          keepTogether: true,
+          node: (
+            <section className="mb-4 break-inside-avoid keep-together">
+              {index === 0 && <h3 className="font-semibold border-b pb-1 mb-2 uppercase tracking-wide text-sm">Responsibilities</h3>}
+              <div className="mb-2 text-sm">
+                <div className="font-medium text-gray-900">
+                  <span className="font-bold">{resp.role}</span>
+                  {resp.organization && <span>, {resp.organization}</span>}
+                  {(resp.startDate || resp.endDate) && (
+                    <span> ({resp.startDate}{resp.startDate && resp.endDate ? '–' : ''}{resp.endDate})</span>
+                  )}
+                  {resp.description && <span>: {resp.description}</span>}
+                </div>
+              </div>
+            </section>
+          ),
+        });
+      });
+    }
+
     return blocks;
-  }, [achievements, certificates, education, experiences, personal, projects, skills]);
+  }, [achievements, certificates, education, experiences, personal, projects, skills, publications, responsibilities]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
@@ -296,49 +356,66 @@ function Preview({ resumeData }) {
     return () => cancelAnimationFrame(frameId);
   }, [contentBlocks]);
 
+  const [downloading, setDownloading] = useState(false);
+
   const handleDownload = async () => {
-    const element = containerRef.current;
+    try {
+      setDownloading(true);
+      const element = containerRef.current;
 
-    if (!element) {
-      return;
-    }
-
-    const pageElements = Array.from(element.querySelectorAll('[data-resume-page="true"]'));
-
-    if (pageElements.length === 0) {
-      return;
-    }
-
-    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-      import("html2canvas"),
-      import("jspdf"),
-    ]);
-
-    const pdf = new jsPDF({
-      unit: "mm",
-      format: "a4",
-      orientation: "portrait",
-      compress: true,
-    });
-
-    for (let pageIndex = 0; pageIndex < pageElements.length; pageIndex += 1) {
-      const pageElement = pageElements[pageIndex];
-      const canvas = await html2canvas(pageElement, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-
-      const imageData = canvas.toDataURL("image/jpeg", 0.98);
-
-      if (pageIndex > 0) {
-        pdf.addPage();
+      if (!element) {
+        console.error("Preview container not found");
+        return;
       }
 
-      pdf.addImage(imageData, "JPEG", 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, "FAST");
-    }
+      const pageElements = Array.from(element.querySelectorAll('[data-resume-page="true"]'));
 
-    pdf.save("resume.pdf");
+      if (pageElements.length === 0) {
+        console.error("No resume pages found");
+        return;
+      }
+
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const pdf = new jsPDF({
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+        compress: true,
+      });
+
+      for (let pageIndex = 0; pageIndex < pageElements.length; pageIndex += 1) {
+        const pageElement = pageElements[pageIndex];
+        const canvas = await html2canvas(pageElement, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          windowWidth: pageElement.scrollWidth,
+          windowHeight: pageElement.scrollHeight,
+        });
+
+        const imageData = canvas.toDataURL("image/jpeg", 0.98);
+
+        if (pageIndex > 0) {
+          pdf.addPage();
+        }
+
+        pdf.addImage(imageData, "JPEG", 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, "FAST");
+      }
+
+      const baseName = resumeName?.trim() || resumeData?.personal?.fullName?.trim() || "Untitled";
+      const fileName = `${baseName.replace(/\s+/g, "_")}_resume.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error("PDF download failed:", error);
+      alert("PDF download failed. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const previewPages = useMemo(() => {
@@ -408,9 +485,29 @@ function Preview({ resumeData }) {
       {/* BUTTON */}
       <button
         onClick={handleDownload}
-        className="mt-6 px-4 py-2 bg-blue-500 text-white rounded"
+        disabled={downloading}
+        className={`mt-6 px-6 py-2.5 rounded-lg text-white font-medium flex items-center gap-2 transition-all ${
+          downloading
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-700 hover:shadow-lg"
+        }`}
       >
-        Download PDF
+        {downloading ? (
+          <>
+            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Generating PDF...
+          </>
+        ) : (
+          <>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Download PDF
+          </>
+        )}
       </button>
     </div>
   );
