@@ -113,11 +113,26 @@ function Sidebar() {
     <aside className="w-[260px] h-screen bg-navy-950 border-r border-white/[0.06] flex flex-col fixed left-0 top-0 z-30">
       {/* Logo */}
       <div className="px-5 py-6 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-accent-violet flex items-center justify-center text-white font-bold text-sm">
-          R
+        <div className="relative w-8 h-8 flex items-center justify-center">
+          <div className="absolute inset-0 bg-gradient-to-tr from-cyan-400 to-violet-500 rounded-lg blur-sm opacity-40 animate-pulse"></div>
+          <svg className="relative w-7 h-7" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="q-glow-sidebar" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#22d3ee" />
+                <stop offset="50%" stopColor="#a78bfa" />
+                <stop offset="100%" stopColor="#ec4899" />
+              </linearGradient>
+            </defs>
+            <circle cx="15" cy="15" r="9" stroke="url(#q-glow-sidebar)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="42 12" />
+            <path d="M12 10.5H17.5L19.5 12.5V19.5H12V10.5Z" fill="white" />
+            <path d="M14 13.5H17" stroke="#0f172a" strokeWidth="1" strokeLinecap="round" />
+            <path d="M14 16.5H17" stroke="#0f172a" strokeWidth="1" strokeLinecap="round" />
+            <path d="M21 21L27 27" stroke="url(#q-glow-sidebar)" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M24 27H27V24" stroke="url(#q-glow-sidebar)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
         <div>
-          <h1 className="text-base font-bold text-white tracking-tight">ResumeAI</h1>
+          <h1 className="text-base font-bold text-white tracking-tight">Resumiq</h1>
           <p className="text-xs text-slate-500">Free plan</p>
         </div>
       </div>
@@ -156,16 +171,48 @@ function Sidebar() {
         </div>
       </nav>
 
-      {/* User */}
-      <div className="px-4 py-4 border-t border-white/[0.06] flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-xs font-bold">
-          SA
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-200 truncate">Sri Aarush</p>
-          <p className="text-xs text-slate-500">Free plan</p>
-        </div>
-      </div>
+      {/* User & Sign Out */}
+      {(() => {
+        const userName = localStorage.getItem("userName") || "Sri Aarush";
+        const userEmail = localStorage.getItem("userEmail") || "";
+        const initials = userName
+          .split(" ")
+          .map(n => n[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase() || "US";
+
+        return (
+          <div className="px-4 py-4 border-t border-white/[0.06] flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-200 truncate">{userName}</p>
+                <p className="text-xs text-slate-500 truncate">{userEmail || "Free plan"}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                // Sign out of Firebase if logged in, and navigate back to login screen
+                import("../../firebase").then(({ auth }) => {
+                  import("firebase/auth").then(({ signOut }) => {
+                    signOut(auth).catch(() => {});
+                  });
+                });
+                window.location.href = "/login";
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all flex-shrink-0"
+              title="Sign Out"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          </div>
+        );
+      })()}
     </aside>
   );
 }

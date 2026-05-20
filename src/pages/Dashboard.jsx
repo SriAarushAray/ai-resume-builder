@@ -23,18 +23,59 @@ function AtsBar({ score }) {
   );
 }
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 /* ── Dashboard Page ── */
 function Dashboard() {
-  const [resumes, setResumes] = useState([]);
+  const userEmail = localStorage.getItem("userEmail") || "anonymous";
+  const resumesKey = `savedResumes_${userEmail}`;
+  const userName = localStorage.getItem("userName") || "Sri Aarush";
 
-  useEffect(() => {
-    const saved = localStorage.getItem("savedResumes");
-    if (saved) {
-      setResumes(JSON.parse(saved));
+  const [resumes, setResumes] = useState(() => {
+    const userEmail = localStorage.getItem("userEmail") || "anonymous";
+    const resumesKey = `savedResumes_${userEmail}`;
+
+    // Gather all resumes from all accounts/guest/legacy keys in local storage to prevent any data loss
+    const keys = Object.keys(localStorage);
+    let allResumes = [];
+
+    keys.forEach(k => {
+      if (k === "savedResumes" || k.startsWith("savedResumes_")) {
+        try {
+          const list = JSON.parse(localStorage.getItem(k) || "[]");
+          if (Array.isArray(list)) {
+            list.forEach(r => {
+              if (r && r.id && !allResumes.some(existing => existing.id === r.id)) {
+                allResumes.push(r);
+              }
+            });
+          }
+        } catch {
+          // ignore invalid json
+        }
+      }
+    });
+
+    // Save the combined list to the active user's key
+    if (allResumes.length > 0) {
+      localStorage.setItem(resumesKey, JSON.stringify(allResumes));
     }
-  }, []);
+
+    return allResumes.map(r => ({
+      ...r,
+      lastEdited: r.lastEdited || Date.now()
+    }));
+  });
+
+  const handleDelete = (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this resume?")) {
+      const updated = resumes.filter(r => r.id !== id);
+      setResumes(updated);
+      localStorage.setItem(resumesKey, JSON.stringify(updated));
+    }
+  };
 
   const stats = [
     { label: "Resumes created", value: resumes.length.toString(), sub: "Total saved", color: "text-emerald-400" },
@@ -44,12 +85,22 @@ function Dashboard() {
   ];
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-b from-[#070b14] to-[#0a1628]">
+      {/* Background Grid Pattern */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:36px_36px] pointer-events-none" />
+
+      {/* Ambient Radial Glows */}
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-violet-600/10 rounded-full blur-[130px] pointer-events-none animate-pulse" />
+      <div className="absolute bottom-[20%] left-[-5%] w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute top-[30%] left-[40%] w-[350px] h-[350px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
+
+      {/* Main Content Wrapper */}
+      <div className="relative z-10 p-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-slate-400 text-sm mt-1">Welcome back, Sri Aarush</p>
+          <p className="text-slate-400 text-sm mt-1">Welcome back, {userName}</p>
         </div>
         <Link
           to="/builder/new"
@@ -111,8 +162,18 @@ function Dashboard() {
           <Link
             key={resume.id}
             to={`/builder/${resume.id}`}
-            className="glass-card p-5 hover:-translate-y-1 transition-all duration-300 hover:border-white/[0.12] group cursor-pointer"
+            className="glass-card p-5 hover:-translate-y-1 transition-all duration-300 hover:border-white/[0.12] group cursor-pointer relative"
           >
+            {/* Delete Resume Button */}
+            <button
+              onClick={(e) => handleDelete(e, resume.id)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/25 z-20"
+              title="Delete Resume"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
             {/* Preview Thumbnail */}
             <div className="w-full h-36 rounded-lg bg-white/[0.04] border border-white/[0.06] mb-4 flex items-center justify-center overflow-hidden group-hover:border-accent/30 transition-colors">
               <div className="w-16 text-center space-y-1.5">
@@ -126,7 +187,7 @@ function Dashboard() {
 
             <h3 className="font-semibold text-white text-sm mb-1">{resume.name || "Untitled Resume"}</h3>
             <p className="text-xs text-slate-500">
-              Modern template · Edited {new Date(resume.lastEdited || Date.now()).toLocaleDateString()}
+              Modern template · Edited {new Date(resume.lastEdited).toLocaleDateString()}
             </p>
 
             <AtsBar score={resume.atsScore || 82} />
@@ -147,6 +208,7 @@ function Dashboard() {
             Create new resume
           </span>
         </Link>
+      </div>
       </div>
     </div>
   );

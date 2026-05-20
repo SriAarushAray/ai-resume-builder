@@ -127,6 +127,9 @@ function Education({ resumeData, setResumeData }) {
             <option value="M.Sc">M.Sc</option>
             <option value="MBA">MBA</option>
             <option value="PhD">PhD</option>
+            {resumeData.education.degree && !["", "B.Tech", "B.E", "B.Sc", "M.Tech", "M.Sc", "MBA", "PhD"].includes(resumeData.education.degree) && (
+              <option value={resumeData.education.degree}>{resumeData.education.degree}</option>
+            )}
           </select>
         </div>
 

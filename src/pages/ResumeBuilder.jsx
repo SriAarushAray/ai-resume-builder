@@ -35,9 +35,22 @@ function ResumeBuilder() {
   // RESUME NAME STATE
   const [resumeName, setResumeName] = useState("Untitled Resume");
 
+  const userEmail = localStorage.getItem("userEmail") || "anonymous";
+  const resumesKey = `savedResumes_${userEmail}`;
+
   // RESUME DATA STATE
   const [resumeData, setResumeData] = useState(() => {
-    const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]");
+    let saved = localStorage.getItem(resumesKey);
+    if (!saved) {
+      const legacy = localStorage.getItem("savedResumes");
+      if (legacy) {
+        localStorage.setItem(resumesKey, legacy);
+        localStorage.removeItem("savedResumes");
+        saved = legacy;
+      }
+    }
+
+    const savedResumes = JSON.parse(saved || "[]");
     const existing = savedResumes.find(r => r.id === id);
     
     if (existing) {
@@ -78,14 +91,14 @@ function ResumeBuilder() {
         };
   });
 
-  // SET NAME ON LOAD
-  useEffect(() => {
-    const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]");
+  // ADJUST STATE ON ROUTE ID CHANGE
+  const [prevId, setPrevId] = useState(id);
+  if (id !== prevId) {
+    setPrevId(id);
+    const savedResumes = JSON.parse(localStorage.getItem(resumesKey) || "[]");
     const existing = savedResumes.find(r => r.id === id);
-    if (existing && existing.name) {
-      setResumeName(existing.name);
-    }
-  }, [id]);
+    setResumeName(existing && existing.name ? existing.name : "Untitled Resume");
+  }
 
   // SAVE TO LOCAL STORAGE
   useEffect(() => {
@@ -93,7 +106,7 @@ function ResumeBuilder() {
     localStorage.setItem("resumeData", JSON.stringify(resumeData));
 
     // Save to the new array structure
-    const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]");
+    const savedResumes = JSON.parse(localStorage.getItem(resumesKey) || "[]");
     const currentId = id === "new" ? Date.now().toString() : (id || "1");
     
     // If it's a new resume and we just generated an ID, we should technically redirect, 
@@ -115,8 +128,8 @@ function ResumeBuilder() {
       savedResumes.push(resumeToSave);
     }
 
-    localStorage.setItem("savedResumes", JSON.stringify(savedResumes));
-  }, [resumeData, resumeName, id]);
+    localStorage.setItem(resumesKey, JSON.stringify(savedResumes));
+  }, [resumeData, resumeName, id, resumesKey]);
 
   // HANDLE DRAGGING
   const handleMouseDown = (e) => {
