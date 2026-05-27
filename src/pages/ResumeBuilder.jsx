@@ -28,6 +28,9 @@ function ResumeBuilder() {
 
   // RESIZE STATE
   const [leftWidth, setLeftWidth] = useState(50);
+
+  // SPACING CONTROL (px of gap between resume sections, 0–24)
+  const [sectionSpacing, setSectionSpacing] = useState(16);
   
   // WIZARD STATE
   const [currentStep, setCurrentStep] = useState(0);
@@ -70,9 +73,14 @@ function ResumeBuilder() {
             summary: "",
           },
           skills: [],
+          groupedSkills: [],
+          suggestedSkills: [],
+          showGroupedSkills: false,
           education: {
             college: "",
+            location: "",
             degree: "",
+            course: "",
             year: "",
             gpa: "",
           },
@@ -153,7 +161,7 @@ function ResumeBuilder() {
   };
 
   return (
-    <div className="min-h-screen bg-navy-900 p-6 flex flex-col">
+    <div className="h-screen bg-navy-900 p-6 flex flex-col overflow-hidden">
       {/* HEADER / NAME INPUT */}
       <div className="mb-4 flex items-center gap-4">
         <button 
@@ -259,10 +267,29 @@ function ResumeBuilder() {
         {/* RIGHT PANEL */}
         <div
           style={{ width: `${100 - leftWidth}%` }}
-          className="bg-gray-200 text-gray-900 h-full overflow-auto p-6"
+          className="bg-gray-200 text-gray-900 h-full overflow-auto"
         >
-          <div className="min-w-[820px]">
-            <Preview resumeData={resumeData} resumeName={resumeName} />
+          {/* Spacing toolbar */}
+          <div className="sticky top-0 z-10 flex items-center gap-3 px-6 py-2 bg-gray-300/80 backdrop-blur-sm border-b border-gray-400/30">
+            <span style={{ fontSize: "11px", fontWeight: 600, color: "#475569", whiteSpace: "nowrap", letterSpacing: "0.03em" }}>
+              ↕ SECTION SPACING
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="24"
+              step="1"
+              value={sectionSpacing}
+              onChange={(e) => setSectionSpacing(Number(e.target.value))}
+              style={{ flex: 1, maxWidth: "160px", accentColor: "#6366f1", height: "4px", cursor: "pointer" }}
+            />
+            <span style={{ fontSize: "11px", fontWeight: 700, color: "#6366f1", minWidth: "28px" }}>{sectionSpacing}px</span>
+          </div>
+
+          <div className="p-6">
+            <div className="min-w-[820px]">
+              <Preview resumeData={resumeData} resumeName={resumeName} sectionSpacing={sectionSpacing} />
+            </div>
           </div>
         </div>
       </div>

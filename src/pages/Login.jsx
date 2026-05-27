@@ -8,6 +8,7 @@ import {
   createUserWithEmailAndPassword,
   isFirebaseMock
 } from "../firebase";
+import { extractTextFromPdf, parseResumeText } from "../utils/pdfParser";
 
 function Login() {
   const navigate = useNavigate();
@@ -256,23 +257,24 @@ function Login() {
     }
   };
 
-  // Handle PDF drop / selection simulation
+  // Handle PDF drop / selection parsing
   const handleFileDrop = (e) => {
     e.preventDefault();
     setDragActive(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      triggerParser();
+      triggerParser(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileSelect = (e) => {
     if (e.target.files && e.target.files[0]) {
-      triggerParser();
+      triggerParser(e.target.files[0]);
     }
   };
 
-  const triggerParser = () => {
+  const triggerParser = async (file) => {
+    if (!file) return;
     setIsParsing(true);
     setParseStep(0);
 
@@ -281,36 +283,59 @@ function Login() {
         if (prev < PARSE_STEPS.length - 1) {
           return prev + 1;
         } else {
-          clearInterval(interval);
           return prev;
         }
       });
-    }, 1000);
+    }, 800);
 
-    setTimeout(() => {
-      clearInterval(interval);
+    try {
+      // 1. Extract text from the PDF file
+      const rawText = await extractTextFromPdf(file);
       
+      // 2. Parse text to structured format
+      const parsedData = parseResumeText(rawText);
+      
+      // Keep loading animation running for a minimum duration to show scanning effect smoothly
+      await new Promise(resolve => setTimeout(resolve, 3200));
+      
+      clearInterval(interval);
+
+      const parsedName = parsedData.personal.fullName || "Guest User";
       localStorage.setItem("userEmail", "guest");
-      localStorage.setItem("userName", "Sri Aarush (Guest)");
+      localStorage.setItem("userName", `${parsedName} (Guest)`);
+      localStorage.setItem("isGuest", "true");
+
       const resumesKey = "savedResumes_guest";
       const savedResumes = JSON.parse(localStorage.getItem(resumesKey) || "[]");
       const newResumeId = "parsed-" + Date.now().toString();
       
+      // Calculate realistic ATS score
+      let atsScore = 65;
+      if (parsedData.skills.length > 5) atsScore += 10;
+      if (parsedData.experiences.length > 0) atsScore += 10;
+      if (parsedData.projects.length > 0) atsScore += 5;
+      if (parsedData.personal.email && parsedData.personal.phone) atsScore += 5;
+      atsScore = Math.min(atsScore, 98);
+
       const parsedResumeObject = {
         id: newResumeId,
-        name: "Sri Aarush's Resume (Parsed)",
+        name: `${parsedName}'s Resume (Parsed)`,
         lastEdited: Date.now(),
-        atsScore: 88,
-        data: mockParsedResume
+        atsScore: atsScore,
+        data: parsedData
       };
 
       savedResumes.push(parsedResumeObject);
       localStorage.setItem(resumesKey, JSON.stringify(savedResumes));
-      localStorage.setItem("isGuest", "true");
 
       setIsParsing(false);
       navigate(`/builder/${newResumeId}`);
-    }, 4500);
+    } catch (err) {
+      console.error("PDF Parsing failed:", err);
+      clearInterval(interval);
+      setIsParsing(false);
+      alert(`Failed to parse the PDF file: ${err.message || err.toString()}\n\nPlease ensure it is a text-based PDF and try again.`);
+    }
   };
 
   return (

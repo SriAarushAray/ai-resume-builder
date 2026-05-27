@@ -8,7 +8,7 @@ const A4_HEIGHT_PX = A4_HEIGHT_MM * PX_PER_MM;
 const PAGE_PADDING_PX = 24;
 const PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_PX - PAGE_PADDING_PX * 2;
 
-function Preview({ resumeData, resumeName }) {
+function Preview({ resumeData, resumeName, sectionSpacing = 16 }) {
   const containerRef = useRef(null);
   const blockRefs = useRef([]);
   const [paginatedBlockIndexes, setPaginatedBlockIndexes] = useState([]);
@@ -16,6 +16,8 @@ function Preview({ resumeData, resumeName }) {
   const {
     personal = {},
     skills = [],
+    groupedSkills = [],
+    showGroupedSkills = false,
     education = {},
     experiences = [],
     projects = [],
@@ -77,20 +79,36 @@ function Preview({ resumeData, resumeName }) {
         key: "summary",
         node: (
           <section className="mb-4">
-            <h3 className="font-semibold border-b pb-1 mb-2">Professional Summary</h3>
+            <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">PROFESSIONAL SUMMARY</h3>
             <p className="text-sm">{personal.summary}</p>
           </section>
         ),
       });
     }
 
-    if (filteredSkills.length > 0) {
+    if (showGroupedSkills && Array.isArray(groupedSkills) && groupedSkills.length > 0) {
       blocks.push({
         key: "skills",
         node: (
           <section className="mb-4">
-            <h3 className="font-semibold border-b pb-1 mb-2">Skills</h3>
-            <p className="text-sm">{filteredSkills.join(", ")}</p>
+            <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">TECHNICAL SKILLS</h3>
+            <div className="text-sm space-y-1 text-left">
+              {groupedSkills.map((group, idx) => (
+                <p key={idx} className="text-sm text-gray-900">
+                  <span className="font-bold">{group.category}</span>: {group.items.join(", ")}
+                </p>
+              ))}
+            </div>
+          </section>
+        ),
+      });
+    } else if (filteredSkills.length > 0) {
+      blocks.push({
+        key: "skills",
+        node: (
+          <section className="mb-4">
+            <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">TECHNICAL SKILLS</h3>
+            <p className="text-sm text-gray-900 text-left">{filteredSkills.join(", ")}</p>
           </section>
         ),
       });
@@ -101,20 +119,17 @@ function Preview({ resumeData, resumeName }) {
         key: "education",
         node: (
           <section className="mb-4">
-            <h3 className="font-semibold border-b pb-1 mb-2">Education</h3>
-            <div className="flex items-start justify-between gap-3">
+            <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">EDUCATION</h3>
+            <div className="flex justify-between items-baseline text-sm font-semibold text-gray-900">
+              <div>{education.college}</div>
+              <div>{education.location}</div>
+            </div>
+            <div className="flex justify-between items-baseline text-sm italic text-gray-700 mt-0.5">
               <div>
-                <p className="font-medium">
-                  {education.degree} - {education.college}
-                </p>
+                {education.degree}{education.course ? ` in ${education.course}` : ""}
+                {education.gpa && ` (CGPA: ${education.gpa})`}
               </div>
-              {(education.gpa || education.year) && (
-                <p className="text-sm text-gray-600 text-right whitespace-nowrap">
-                  {education.gpa && `CGPA: ${education.gpa}`}
-                  {education.gpa && education.year && " | "}
-                  {education.year}
-                </p>
-              )}
+              <div>{education.year}</div>
             </div>
           </section>
         ),
@@ -127,9 +142,14 @@ function Preview({ resumeData, resumeName }) {
           key: `project-${index}`,
           node: (
             <section className="mb-4">
-              {index === 0 && <h3 className="font-semibold border-b pb-1 mb-2">Projects</h3>}
+              {index === 0 && <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">PROJECTS</h3>}
               <div className="mb-2">
-                <p className="font-medium">{project.title}</p>
+                <p className="font-medium">
+                  {project.title}
+                  {project.technologies && (
+                    <span className="font-normal text-gray-600"> | {project.technologies}</span>
+                  )}
+                </p>
                 {Array.isArray(project.points) && project.points.some((point) => point?.trim()) ? (
                   <ul className="text-sm list-disc ml-5">
                     {project.points
@@ -139,15 +159,13 @@ function Preview({ resumeData, resumeName }) {
                       ))}
                   </ul>
                 ) : null}
-                {project.technologies && (
-                  <p className="text-sm text-gray-600">Technologies: {project.technologies}</p>
-                )}
               </div>
             </section>
           ),
         });
       });
     }
+
 
     if (filteredExperiences.length > 0) {
       filteredExperiences.forEach((experience, index) => {
@@ -156,7 +174,7 @@ function Preview({ resumeData, resumeName }) {
           keepTogether: true,
           node: (
             <section className="mb-4 break-inside-avoid keep-together">
-              {index === 0 && <h3 className="font-semibold border-b pb-1 mb-2">Experience</h3>}
+              {index === 0 && <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">EXPERIENCE</h3>}
               <div className="mb-2">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -175,14 +193,24 @@ function Preview({ resumeData, resumeName }) {
                   )}
                 </div>
 
-                {experience.description && (
+                {/* Prefer AI bullet points if available, else fall back to plain description */}
+                {Array.isArray(experience.points) && experience.points.some((p) => p?.trim()) ? (
+                  <ul className="text-sm list-disc ml-5 mt-1 text-gray-700">
+                    {experience.points
+                      .filter((p) => p?.trim())
+                      .map((point, pi) => (
+                        <li key={pi}>{point}</li>
+                      ))}
+                  </ul>
+                ) : experience.description ? (
                   <p className="text-sm text-gray-700 mt-1">{experience.description}</p>
-                )}
+                ) : null}
               </div>
             </section>
           ),
         });
       });
+
     }
 
     if (filteredAchievements.length > 0) {
@@ -191,7 +219,7 @@ function Preview({ resumeData, resumeName }) {
           key: `achievement-${index}`,
           node: (
             <section className="mb-4">
-              {index === 0 && <h3 className="font-semibold border-b pb-1 mb-2">Achievements</h3>}
+              {index === 0 && <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">ACHIEVEMENTS</h3>}
               <div className="mb-2">
                 <p className="font-medium">• {achievement.title}</p>
                 {achievement.description && (
@@ -211,30 +239,34 @@ function Preview({ resumeData, resumeName }) {
           keepTogether: true,
           node: (
             <section className="mb-4 break-inside-avoid keep-together">
-              {index === 0 && <h3 className="font-semibold border-b pb-1 mb-2">Certificates</h3>}
+              {index === 0 && <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">CERTIFICATIONS</h3>}
               <div className="mb-2">
                 <div className="flex items-start justify-between gap-3">
-                  {certificate.link ? (
-                    <a
-                      href={certificate.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-blue-600"
-                    >
-                      {certificate.name}
-                    </a>
-                  ) : (
-                    <p className="font-medium">{certificate.name}</p>
-                  )}
+                  <p className="font-medium">
+                    {certificate.link ? (
+                      <a
+                        href={certificate.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600"
+                      >
+                        {certificate.name}
+                      </a>
+                    ) : (
+                      certificate.name
+                    )}
+                    {certificate.issuer && (
+                      <span className="font-normal text-gray-600"> | {certificate.issuer}</span>
+                    )}
+                  </p>
 
                   {certificate.year && (
                     <p className="text-sm text-gray-600 text-right whitespace-nowrap">{certificate.year}</p>
                   )}
                 </div>
-
-                {certificate.issuer && <p className="text-sm text-gray-600">{certificate.issuer}</p>}
               </div>
             </section>
+
           ),
         });
       });
@@ -247,7 +279,7 @@ function Preview({ resumeData, resumeName }) {
           keepTogether: true,
           node: (
             <section className="mb-4 break-inside-avoid keep-together">
-              {index === 0 && <h3 className="font-semibold border-b pb-1 mb-2 uppercase tracking-wide text-sm">Publications</h3>}
+              {index === 0 && <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">PUBLICATIONS</h3>}
               <div className="mb-2">
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-bold text-sm">{pub.title}</p>
@@ -275,7 +307,7 @@ function Preview({ resumeData, resumeName }) {
           keepTogether: true,
           node: (
             <section className="mb-4 break-inside-avoid keep-together">
-              {index === 0 && <h3 className="font-semibold border-b pb-1 mb-2 uppercase tracking-wide text-sm">Responsibilities</h3>}
+              {index === 0 && <h3 className="font-bold border-b border-gray-900 pb-0.5 mb-2 uppercase tracking-wide text-sm text-gray-900">RESPONSIBILITIES</h3>}
               <div className="mb-2 text-sm">
                 <div className="font-medium text-gray-900">
                   <span className="font-bold">{resp.role}</span>
@@ -293,7 +325,7 @@ function Preview({ resumeData, resumeName }) {
     }
 
     return blocks;
-  }, [achievements, certificates, education, experiences, personal, projects, skills, publications, responsibilities]);
+  }, [achievements, certificates, education, experiences, personal, projects, skills, publications, responsibilities, groupedSkills, showGroupedSkills]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
@@ -444,7 +476,7 @@ function Preview({ resumeData, resumeName }) {
           <React.Fragment key={`page-${pageIndex}`}>
             <div
               data-resume-page="true"
-              className="bg-white p-6 shadow-lg overflow-hidden"
+              className="bg-white p-6 shadow-lg overflow-hidden font-serif"
               style={{ width: `${A4_WIDTH_MM}mm`, height: `${A4_HEIGHT_MM}mm` }}
             >
               {pageBlockIndexes.map((blockIndex) => {
@@ -455,7 +487,7 @@ function Preview({ resumeData, resumeName }) {
                 }
 
                 return (
-                  <div key={block.key} className="flow-root">
+                  <div key={block.key} className="flow-root" style={{ marginBottom: `${sectionSpacing}px` }}>
                     {block.node}
                   </div>
                 );
@@ -467,11 +499,12 @@ function Preview({ resumeData, resumeName }) {
 
       {/* MEASURE BLOCKS OFFSCREEN TO PAGINATE AT TRUE A4 HEIGHT */}
       <div className="absolute -left-[9999px] top-0 opacity-0 pointer-events-none" aria-hidden="true">
-        <div style={{ width: `${A4_WIDTH_MM}mm` }} className="p-6">
+        <div style={{ width: `${A4_WIDTH_MM}mm` }} className="p-6 font-serif">
           {contentBlocks.map((block, index) => (
             <div
               key={`measure-${block.key}`}
               className="flow-root"
+              style={{ marginBottom: `${sectionSpacing}px` }}
               ref={(element) => {
                 blockRefs.current[index] = element;
               }}
