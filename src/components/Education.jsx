@@ -4,25 +4,25 @@ import MonthYearPicker from "./MonthYearPicker";
 // Local registry of major campuses (SRM, VIT, IITs, BITS, NITs) and top global universities
 const offlineColleges = [
   // SRM Campuses
-  "SRM University AP (Amaravati)",
+  "SRM University AP ",
   "SRM Institute of Science and Technology, Kattankulathur (KTR)",
   "SRM Institute of Science and Technology, Ramapuram",
   "SRM Institute of Science and Technology, Vadapalani",
   "SRM University, Delhi-NCR",
   "SRM University, Sikkim",
   "SRM University, Trichy",
-  
+
   // VIT Campuses
   "VIT Vellore",
   "VIT Chennai",
   "VIT Andhra Pradesh (VIT-AP)",
   "VIT Bhopal",
-  
+
   // BITS Campuses
   "BITS Pilani",
   "BITS Pilani, Goa Campus",
   "BITS Pilani, Hyderabad Campus",
-  
+
   // Top IITs
   "Indian Institute of Technology Madras (IIT Madras)",
   "Indian Institute of Technology Bombay (IIT Bombay)",
@@ -33,14 +33,14 @@ const offlineColleges = [
   "Indian Institute of Technology Guwahati (IIT Guwahati)",
   "Indian Institute of Technology Hyderabad (IIT Hyderabad)",
   "Indian Institute of Technology BHU (IIT Varanasi)",
-  
+
   // Top NITs
   "National Institute of Technology Trichy (NIT Trichy)",
   "National Institute of Technology Karnataka (NIT Surathkal)",
   "National Institute of Technology Rourkela (NIT Rourkela)",
   "National Institute of Technology Warangal (NIT Warangal)",
   "Motilal Nehru National Institute of Technology (MNNIT Allahabad)",
-  
+
   // Major Indian Universities
   "Delhi University (DU)",
   "Anna University, Chennai",
@@ -48,7 +48,7 @@ const offlineColleges = [
   "Banaras Hindu University (BHU)",
   "Amity University",
   "Manipal Academy of Higher Education",
-  
+
   // Top World Universities
   "Harvard University",
   "Stanford University",
@@ -76,36 +76,36 @@ function Education({ resumeData, setResumeData }) {
   const locDropdownRef = useRef(null);
 
   const handleChange = (e) => {
-    setResumeData({
-      ...resumeData,
+    setResumeData(prev => ({
+      ...prev,
       education: {
-        ...resumeData.education,
+        ...(prev.education || {}),
         [e.target.name]: e.target.value,
       },
-    });
+    }));
   };
 
   const handleCollegeClick = (college) => {
-    setResumeData({
-      ...resumeData,
+    setResumeData(prev => ({
+      ...prev,
       education: {
-        ...resumeData.education,
+        ...(prev.education || {}),
         college: college,
       },
-    });
+    }));
 
     setShowSuggestions(false);
     setHighlightIndex(-1);
   };
 
   const handleLocationClick = (loc) => {
-    setResumeData({
-      ...resumeData,
+    setResumeData(prev => ({
+      ...prev,
       education: {
-        ...resumeData.education,
+        ...(prev.education || {}),
         location: loc,
       },
-    });
+    }));
     setShowLocSuggestions(false);
     setLocHighlightIndex(-1);
   };
@@ -131,7 +131,7 @@ function Education({ resumeData, setResumeData }) {
         if (response.ok) {
           const data = await response.json();
           const apiNames = data.map((item) => item.name);
-          
+
           // Merge local and API names, removing duplicates, and limit to 10
           const merged = [...new Set([...localFiltered, ...apiNames])].slice(0, 10);
           setSuggestions(merged);
@@ -165,7 +165,7 @@ function Education({ resumeData, setResumeData }) {
               const city = item.name;
               const state = item.admin1 || "";
               const country = item.country || "";
-              
+
               // Map Indian state names to standard abbreviations
               let stateAbbr = state;
               if (country === "India") {
@@ -201,7 +201,7 @@ function Education({ resumeData, setResumeData }) {
                 };
                 if (indiaStates[state]) stateAbbr = indiaStates[state];
               }
-              
+
               return stateAbbr ? `${city}, ${stateAbbr}` : city;
             });
             setLocSuggestions([...new Set(formatted)]);
@@ -279,7 +279,7 @@ function Education({ resumeData, setResumeData }) {
           {showSuggestions &&
             resumeData.education.college !== "" &&
             (isLoading || suggestions.length > 0) && (
-              <div 
+              <div
                 ref={dropdownRef}
                 className="absolute top-full mt-1 w-full bg-white border border-gray-200 rounded-md shadow-md z-10 max-h-60 overflow-y-auto"
               >
@@ -293,11 +293,10 @@ function Education({ resumeData, setResumeData }) {
                     <div
                       key={index}
                       onClick={() => handleCollegeClick(college)}
-                      className={`px-3 py-2 text-sm cursor-pointer text-left ${
-                        highlightIndex === index
+                      className={`px-3 py-2 text-sm cursor-pointer text-left ${highlightIndex === index
                           ? "bg-blue-100"
                           : "hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       {college}
                     </div>
@@ -348,7 +347,7 @@ function Education({ resumeData, setResumeData }) {
           {showLocSuggestions &&
             resumeData.education.location !== "" &&
             (isLocLoading || locSuggestions.length > 0) && (
-              <div 
+              <div
                 ref={locDropdownRef}
                 className="absolute top-full mt-1 w-full bg-white border border-gray-200 rounded-md shadow-md z-10 max-h-60 overflow-y-auto"
               >
@@ -362,11 +361,10 @@ function Education({ resumeData, setResumeData }) {
                     <div
                       key={index}
                       onClick={() => handleLocationClick(loc)}
-                      className={`px-3 py-2 text-sm cursor-pointer text-left ${
-                        locHighlightIndex === index
+                      className={`px-3 py-2 text-sm cursor-pointer text-left ${locHighlightIndex === index
                           ? "bg-blue-100"
                           : "hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       {loc}
                     </div>

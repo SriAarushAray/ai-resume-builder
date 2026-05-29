@@ -4,32 +4,28 @@ function Publications({ resumeData, setResumeData }) {
   const publications = resumeData.publications || [];
 
   const addPublication = () => {
-    setResumeData({
-      ...resumeData,
+    setResumeData(prev => ({
+      ...prev,
       publications: [
-        ...publications,
+        ...(prev.publications || []),
         { title: "", date: "", description: "" },
       ],
-    });
+    }));
   };
 
   const updatePublication = (index, field, value) => {
-    const updated = [...publications];
-    updated[index][field] = value;
-
-    setResumeData({
-      ...resumeData,
-      publications: updated,
+    setResumeData(prev => {
+      const updated = [...(prev.publications || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, publications: updated };
     });
   };
 
   const removePublication = (index) => {
-    const updated = publications.filter((_, i) => i !== index);
-
-    setResumeData({
-      ...resumeData,
-      publications: updated,
-    });
+    setResumeData(prev => ({
+      ...prev,
+      publications: (prev.publications || []).filter((_, i) => i !== index),
+    }));
   };
 
   return (

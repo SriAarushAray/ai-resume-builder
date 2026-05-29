@@ -41,6 +41,49 @@ function Experience({ resumeData, setResumeData }) {
     if (previewBullets?.index === indexToRemove) setPreviewBullets(null);
   };
 
+  const addExperiencePoint = (expIndex) => {
+    setResumeData((prev) => {
+      const updated = [...(prev.experiences || [])];
+      const currentPoints = Array.isArray(updated[expIndex]?.points)
+        ? updated[expIndex].points
+        : [];
+      updated[expIndex] = {
+        ...updated[expIndex],
+        points: [...currentPoints, ""],
+      };
+      return { ...prev, experiences: updated };
+    });
+  };
+
+  const updateExperiencePoint = (expIndex, pointIndex, value) => {
+    setResumeData((prev) => {
+      const updated = [...(prev.experiences || [])];
+      const currentPoints = Array.isArray(updated[expIndex]?.points)
+        ? [...updated[expIndex].points]
+        : [];
+      currentPoints[pointIndex] = value;
+      updated[expIndex] = {
+        ...updated[expIndex],
+        points: currentPoints,
+      };
+      return { ...prev, experiences: updated };
+    });
+  };
+
+  const removeExperiencePoint = (expIndex, pointIndexToRemove) => {
+    setResumeData((prev) => {
+      const updated = [...(prev.experiences || [])];
+      const currentPoints = Array.isArray(updated[expIndex]?.points)
+        ? updated[expIndex].points
+        : [];
+      updated[expIndex] = {
+        ...updated[expIndex],
+        points: currentPoints.filter((_, pointIndex) => pointIndex !== pointIndexToRemove),
+      };
+      return { ...prev, experiences: updated };
+    });
+  };
+
   const handleRewriteBullets = async (index) => {
     const exp = experiences[index];
     if (!exp.role && !exp.company) {
@@ -155,26 +198,52 @@ function Experience({ resumeData, setResumeData }) {
                 rows={2}
               />
 
-              {/* AI Bullet Points (applied) */}
-              {Array.isArray(experience.points) && experience.points.length > 0 && (
-                <div style={{ marginBottom: "10px", background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)", border: "1px solid #86efac", borderRadius: "10px", padding: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "13px" }}>✅</span>
-                    <span style={{ fontWeight: 600, fontSize: "12px", color: "#15803d" }}>AI Bullet Points Applied</span>
-                    <button
-                      onClick={() => updateExperience(index, "points", [])}
-                      style={{ marginLeft: "auto", fontSize: "11px", color: "#dc2626", background: "none", border: "none", cursor: "pointer", padding: "2px 6px", borderRadius: "4px" }}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <ul style={{ margin: 0, paddingLeft: "18px", listStyle: "disc" }}>
-                    {experience.points.map((pt, pi) => (
-                      <li key={pi} style={{ fontSize: "13px", color: "#166534", marginBottom: "4px" }}>{pt}</li>
-                    ))}
-                  </ul>
+              {/* Experience Bullet Points (Editable) */}
+              <div className="mt-3 mb-4 text-left">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-700">
+                    Job Description Bullet Points {Array.isArray(experience.points) && experience.points.length > 0 && <span className="ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">AI Applied</span>}
+                  </label>
                 </div>
-              )}
+                <div className="space-y-2">
+                  {(experience.points || []).map((point, pointIndex) => (
+                    <div key={pointIndex} className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder={`Bullet point ${pointIndex + 1}`}
+                        value={point}
+                        onChange={(e) => updateExperiencePoint(index, pointIndex, e.target.value)}
+                        className="w-full border p-2 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeExperiencePoint(index, pointIndex)}
+                        className="text-red-500 hover:text-red-700 text-xs px-2"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-4 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => addExperiencePoint(index)}
+                    className="text-blue-600 text-xs font-semibold hover:underline"
+                  >
+                    + Add Bullet Point
+                  </button>
+                  {Array.isArray(experience.points) && experience.points.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => updateExperience(index, "points", [])}
+                      className="text-red-500 text-xs font-semibold hover:underline"
+                    >
+                      Clear All Bullets
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {/* ✨ Rewrite Bullets Button */}
               <button

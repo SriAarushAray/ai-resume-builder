@@ -28,10 +28,17 @@ app.use(express.json());
 // Print setup info on start
 const hasGitHubKeys = !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
 const hasLinkedInKeys = !!(process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET);
+const hasClaudeKey = !!(process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY);
 const hasGeminiKey = !!process.env.GEMINI_API_KEY;
 const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
 
-const aiProvider = hasGeminiKey ? "Gemini (gemini-2.5-flash)" : hasOpenAIKey ? "OpenAI (gpt-4o-mini)" : "LOCAL FALLBACK (no API key)";
+const aiProvider = hasClaudeKey 
+  ? "Claude (claude-3-5-sonnet)" 
+  : hasGeminiKey 
+  ? "Gemini (gemini-2.5-flash)" 
+  : hasOpenAIKey 
+  ? "OpenAI (gpt-4o-mini)" 
+  : "LOCAL FALLBACK (no API key)";
 
 console.log("--------------------------------------------------");
 console.log(`Resumiq Backend: GitHub OAuth configuration: ${hasGitHubKeys ? "ACTIVE" : "FALLBACK (MOCK)"}`);
@@ -1001,7 +1008,391 @@ Requirements:
   }
 });
 
+// ==========================================
+// 6. AI JOB DESCRIPTION MATCHING & TAILORING ENDPOINT
+// ==========================================
+app.post("/api/ai/job-match", async (req, res) => {
+  try {
+    const { resumeData, jobDescription, jobTitle } = req.body;
+    if (!resumeData || !jobDescription) {
+      return res.status(400).json({ error: "resumeData and jobDescription are required." });
+    }
+
+    const claudeKey = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    const prompt = `You are an expert ATS (Applicant Tracking System) recruiter and resume optimization AI.
+Analyze the following candidate resume data and the target job description:
+
+Target Job Title: ${jobTitle || "Not specified"}
+Target Job Description:
+"""
+${jobDescription}
+"""
+
+Resume Data:
+"""
+${JSON.stringify(resumeData)}
+"""
+
+Tasks:
+1. Compare the skills, experience, and projects in the resume against the requirements in the Job Description.
+2. Identify which core skills/technologies from the Job Description are "matched" (present in the resume) vs "missing" (required/recommended in the JD but absent or weak in the resume).
+3. Compute a real ATS Match Score (0 to 100) representing how well the candidate's profile matches the JD.
+4. Review every bullet point, summary, and description in the resume's experiences and projects, and generate an optimized "tailored" version. Each optimized bullet should start with a strong action verb, incorporate relevant missing keywords from the JD naturally, and include a realistic quantitative metric (e.g. "improving efficiency by 20%") matching the context of the work.
+5. Return the result in raw JSON format. The JSON must have exactly this structure:
+{
+  "score": 85,
+  "matched": ["React", "TypeScript", "Node.js"],
+  "missing": ["Docker", "CI/CD", "Jest"],
+  "tailoredBullets": [
+    {
+      "type": "experience",
+      "index": 0,
+      "field": "summary",
+      "label": "InnovateTech Solutions - Senior Frontend Engineer (Summary)",
+      "original": "Worked on the React dashboard.",
+      "tailored": "Architected modular analytics widgets using React, cutting dashboard latency by 34% and improving team sprint velocities."
+    }
+  ]
+}
+
+Ensure the "tailoredBullets" array matches the exact items from the candidate's experiences and projects.
+Return ONLY raw JSON, with no markdown code block wrapping or formatting explanation.`;
+
+    if (claudeKey) {
+      try {
+        console.log("Backend AI: Calling Claude API for job match analysis...");
+        const response = await axios.post(
+          "https://api.anthropic.com/v1/messages",
+          {
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 4000,
+            messages: [{ role: "user", content: prompt }]
+          },
+          {
+            headers: {
+              "x-api-key": claudeKey,
+              "anthropic-version": "2023-06-01",
+              "content-type": "application/json"
+            }
+          }
+        );
+
+        const responseText = response.data?.content?.[0]?.text;
+        if (responseText) {
+          const parsed = JSON.parse(responseText.trim());
+          console.log("Backend AI: Claude job match completed successfully.");
+          return res.json(parsed);
+        }
+      } catch (err) {
+        console.error("Backend AI: Claude job match call failed, falling back to other providers:", err.message);
+      }
+    }
+
+    if (geminiKey) {
+      try {
+        console.log("Backend AI: Calling Gemini API for job match analysis...");
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+          {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json"
+            }
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+
+        const responseText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (responseText) {
+          const parsed = JSON.parse(responseText.trim());
+          console.log("Backend AI: Gemini job match completed successfully.");
+          return res.json(parsed);
+        }
+      } catch (err) {
+        console.error("Backend AI: Gemini job match call failed, falling back to other providers:", err.message);
+      }
+    }
+
+    if (openaiKey) {
+      try {
+        console.log("Backend AI: Calling OpenAI API for job match analysis...");
+        const response = await axios.post(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" }
+          },
+          { headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" } }
+        );
+
+        const resText = response.data?.choices?.[0]?.message?.content;
+        if (resText) {
+          const parsed = JSON.parse(resText.trim());
+          console.log("Backend AI: OpenAI job match completed successfully.");
+          return res.json(parsed);
+        }
+      } catch (err) {
+        console.error("Backend AI: OpenAI job match call failed, falling back to local simulation:", err.message);
+      }
+    }
+
+    // Local Fallback response if no keys or APIs fail
+    console.log("Backend AI: No API keys present or call failed. Returning signature-compatible simulated match payload...");
+    return res.json({ fallback: true });
+  } catch (error) {
+    console.error("Backend AI: Crash in job-match route:", error);
+    return res.status(500).json({ error: "Internal server error during job description matching." });
+  }
+});
+
+// ==========================================
+// 8. COVER LETTER AI GENERATOR ENDPOINT
+// ==========================================
+app.post("/api/ai/generate-cover-letter", async (req, res) => {
+  try {
+    const { resumeData, companyName, jobTitle, jobDescription, tone } = req.body;
+    
+    const claudeKey = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    const fullName = resumeData?.personal?.fullName || "Sri Aarush Aray";
+    const email = resumeData?.personal?.email || "sriaarush@email.com";
+    const phone = resumeData?.personal?.phone || "+91 98765 43210";
+    const location = resumeData?.personal?.location || "Bangalore, India";
+    const topSkills = resumeData?.skills || ["React", "JavaScript", "TypeScript", "Node.js"];
+    const experiences = resumeData?.experiences || [];
+    const projects = resumeData?.projects || [];
+
+    const prompt = `Write a cover letter for a candidate named ${fullName} applying for the role of ${jobTitle} at ${companyName}.
+Candidate contact details:
+Email: ${email}
+Phone: ${phone}
+Location: ${location}
+
+Candidate skills: ${topSkills.join(", ")}
+Candidate experiences: ${JSON.stringify(experiences.map(e => ({ company: e.company, role: e.role, summary: e.summary || e.points?.[0] })))}
+Candidate projects: ${JSON.stringify(projects.map(p => ({ title: p.title, technologies: p.technologies, points: p.points })))}
+
+Job Description:
+${jobDescription || "No specific job description provided."}
+
+The tone of the cover letter must be: ${tone || "Professional"}.
+Return ONLY the text of the cover letter. Do not include markdown code blocks or outer JSON wrapper. Start directly with the candidate name or current date.`;
+
+    if (claudeKey) {
+      try {
+        console.log("Backend AI: Calling Claude API for cover letter generation...");
+        const response = await axios.post(
+          "https://api.anthropic.com/v1/messages",
+          {
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 3000,
+            messages: [{ role: "user", content: prompt }]
+          },
+          {
+            headers: {
+              "x-api-key": claudeKey,
+              "anthropic-version": "2023-06-01",
+              "content-type": "application/json"
+            }
+          }
+        );
+        const responseText = response.data?.content?.[0]?.text;
+        if (responseText) {
+          console.log("Backend AI: Claude cover letter generated.");
+          return res.json({ letter: responseText.trim() });
+        }
+      } catch (err) {
+        console.error("Backend AI: Claude cover letter call failed:", err.message);
+      }
+    }
+
+    if (geminiKey) {
+      try {
+        console.log("Backend AI: Calling Gemini API for cover letter generation...");
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+          {
+            contents: [{ parts: [{ text: prompt }] }]
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+        const responseText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (responseText) {
+          console.log("Backend AI: Gemini cover letter generated.");
+          return res.json({ letter: responseText.trim() });
+        }
+      } catch (err) {
+        console.error("Backend AI: Gemini cover letter call failed:", err.message);
+      }
+    }
+
+    if (openaiKey) {
+      try {
+        console.log("Backend AI: Calling OpenAI API for cover letter generation...");
+        const response = await axios.post(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }]
+          },
+          { headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" } }
+        );
+        const responseText = response.data?.choices?.[0]?.message?.content;
+        if (responseText) {
+          console.log("Backend AI: OpenAI cover letter generated.");
+          return res.json({ letter: responseText.trim() });
+        }
+      } catch (err) {
+        console.error("Backend AI: OpenAI cover letter call failed:", err.message);
+      }
+    }
+
+    // Local Fallback Builder
+    console.log("Backend AI: Using local fallback cover letter generator...");
+    const dateStr = new Date().toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' });
+
+    let opening = "";
+    let body1 = "";
+    let body2 = "";
+    let closing = "";
+
+    // Draft sections based on tone
+    if (tone === "Enthusiastic") {
+      opening = `Dear Hiring Team at ${companyName},
+
+I was absolutely thrilled to come across the ${jobTitle} opening at your company! I have been following ${companyName}'s work and its impact on the industry for some time, and the chance to contribute to your mission as a passionate ${jobTitle} is an opportunity I just couldn't pass up.`;
+      
+      body1 = `As a developer skilled in ${topSkills.slice(0, 4).join(", ")}, I bring a combination of technical adaptability and an eager mindset to your team.`;
+      
+      if (experiences.length > 0) {
+        const exp = experiences[0];
+        body1 += ` During my time as a ${exp.role} at ${exp.company}, I was energized by solving complex engineering bottlenecks, particularly where I ${exp.summary || "collaborated with cross-functional teams to build interfaces"}. I thrive in collaborative environments where fast learning and active contributions are valued.`;
+      }
+
+      if (projects.length > 0) {
+        const proj = projects[0];
+        body2 = `Furthermore, my project ${proj.title} (built using ${proj.technologies}) represents my drive to explore technologies outside my comfort zone. I am incredibly eager to bring this same energy, continuous learning mindset, and problem-solving focus to the daily tasks at ${companyName}.`;
+      } else {
+        body2 = `I am eager to translate my technical skills and enthusiasm for modern engineering architectures into immediate value for your development sprints, supporting your team's upcoming launches.`;
+      }
+
+      closing = `I would love the opportunity to chat about how my energy and background align with your team's goals. Thank you for your time and consideration!
+
+Warmest regards,
+
+${fullName}`;
+    } else if (tone === "Creative") {
+      opening = `Hello ${companyName} Team,
+
+Every engineering team has a story of how they build things, and I've always admired how ${companyName} approaches design and scalability. When I saw the opening for a ${jobTitle}, I knew this was a place where my knack for crafting clean code and innovative user experiences would find a perfect home.`;
+
+      body1 = `Technical toolkits like ${topSkills.slice(0, 4).join(", ")} are tools of the trade, but my real strength lies in figuring out the 'why' behind user issues and designing robust solutions.`;
+
+      if (experiences.length > 0) {
+        const exp = experiences[0];
+        body1 += ` In my role as a ${exp.role} at ${exp.company}, I focused on redefining how we structured our development workflows, specifically helping to ${exp.summary || "modernize old UI structures and improve speeds"}. I enjoy finding creative solutions to structural constraints.`;
+      }
+
+      if (projects.length > 0) {
+        const proj = projects[0];
+        body2 = `A great example of my hands-on creativity is ${proj.title}, which I engineered using ${proj.technologies}. It allowed me to solve a unique challenge: ${proj.points?.[0] || "rendering dynamic frontend telemetry components smoothly"}. I'm ready to bring this inventive spirit to the product engineering challenges at ${companyName}.`;
+      } else {
+        body2 = `I'm eager to join a forward-thinking group of creators at ${companyName} where I can write high-quality features, iterate quickly, and turn technical problems into elegant user features.`;
+      }
+
+      closing = `Let's connect and share ideas on how we can collaborate. Thanks for checking out my application!
+
+Best creative regards,
+
+${fullName}`;
+    } else if (tone === "Formal") {
+      opening = `${fullName}
+${email} | ${phone}
+${location}
+
+${dateStr}
+
+The Hiring Committee
+${companyName}
+
+Subject: Application for the Position of ${jobTitle}
+
+Dear Members of the Hiring Committee,
+
+I am writing to express my formal interest in the ${jobTitle} position currently open at ${companyName}. With a strong foundation in software engineering principles and a specialized expertise in ${topSkills.slice(0, 4).join(", ")}, I am confident in my capacity to make a significant contribution to your technical division.`;
+
+      if (experiences.length > 0) {
+        const exp = experiences[0];
+        body1 = `My professional credentials include serving as a ${exp.role} for ${exp.company}. In this capacity, I was entrusted with critical development and system optimization responsibilities, notably where I ${exp.summary || "spearheaded dashboard refactoring and sprint reviews"}. This experience has refined my ability to deliver quality code under rigorous deployment schedules.`;
+      } else {
+        body1 = `My training and project portfolio have equipped me with a rigorous understanding of structured development patterns, clean styling protocols, and efficient state managers, aligning with the expectations established for this role.`;
+      }
+
+      if (projects.length > 0) {
+        const proj = projects[0];
+        body2 = `In addition, I have developed ${proj.title}, an application utilizing ${proj.technologies}. This project highlights my capability to design robust databases and orchestrate structured API frameworks. I intend to bring this same systematic approach and dedication to performance optimization to ${companyName}.`;
+      } else {
+        body2 = `I am prepared to apply my technical background and disciplined work ethic to meet the strategic product benchmarks of ${companyName}.`;
+      }
+
+      closing = `Thank you for your time and review of my qualifications. I welcome the opportunity to discuss my professional suitability for this position in an interview.
+
+Respectfully yours,
+
+${fullName}`;
+    } else {
+      // Default: Professional
+      opening = `${fullName}
+${email} | ${phone}
+${location}
+
+${dateStr}
+
+Hiring Manager
+${companyName}
+
+Dear Hiring Manager,
+
+I am writing to express my strong interest in the ${jobTitle} position at ${companyName}. As a software engineer with practical experience developing applications using ${topSkills.slice(0, 4).join(", ")}, I am excited about the opportunity to contribute to your engineering team's success.`;
+
+      if (experiences.length > 0) {
+        const exp = experiences[0];
+        body1 = `In my previous role as a ${exp.role} at ${exp.company}, I was responsible for building scalable interfaces and collaborating closely with product managers. A key highlight was my work to ${exp.summary || "optimize dashboard features and improve system response times"}, which helped improve overall team output and application usability.`;
+      } else {
+        body1 = `Throughout my development projects, I have focused on writing clean, maintainable code and solving complex performance issues, ensuring that user interfaces remain fast, responsive, and robust.`;
+      }
+
+      if (projects.length > 0) {
+        const proj = projects[0];
+        body2 = `Additionally, my project ${proj.title}, which I built using ${proj.technologies}, demonstrates my ability to handle end-to-end features. I successfully ${proj.points?.[0] || "implemented real-time data visualizers and modular layouts"}. I am eager to apply this technical experience and my problem-solving skills to the challenges at ${companyName}.`;
+      } else {
+        body2 = `I am confident that my technical skills, professional work ethic, and ability to collaborate effectively make me a strong candidate for the ${jobTitle} position.`;
+      }
+
+      closing = `Thank you for your time and consideration. I look forward to the possibility of discussing how my background meets your needs.
+
+Sincerely,
+
+${fullName}`;
+    }
+
+    const fullLetter = `${opening}\n\n${body1}\n\n${body2}\n\n${closing}`;
+    return res.json({ letter: fullLetter });
+
+  } catch (error) {
+    console.error("Backend AI Error in generate-cover-letter:", error);
+    return res.status(500).json({ error: "Internal server error during cover letter generation." });
+  }
+});
+
 // Start listening for web requests
 app.listen(PORT, () => {
   console.log(`Backend server successfully running on port ${PORT}`);
 });
+

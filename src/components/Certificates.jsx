@@ -5,32 +5,28 @@ function Certificates({ resumeData, setResumeData }) {
   const certificates = resumeData.certificates;
 
   const addCertificate = () => {
-    setResumeData({
-      ...resumeData,
+    setResumeData(prev => ({
+      ...prev,
       certificates: [
-        ...certificates,
+        ...(prev.certificates || []),
         { name: "", issuer: "", year: "", link: "" }
       ]
-    });
+    }));
   };
 
   const updateCertificate = (index, field, value) => {
-    const updated = [...certificates];
-    updated[index][field] = value;
-
-    setResumeData({
-      ...resumeData,
-      certificates: updated
+    setResumeData(prev => {
+      const updated = [...(prev.certificates || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, certificates: updated };
     });
   };
 
   const removeCertificate = (index) => {
-    const updated = certificates.filter((_, i) => i !== index);
-
-    setResumeData({
-      ...resumeData,
-      certificates: updated
-    });
+    setResumeData(prev => ({
+      ...prev,
+      certificates: (prev.certificates || []).filter((_, i) => i !== index)
+    }));
   };
 
   return (

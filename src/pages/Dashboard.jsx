@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { TemplatePickerModal } from "./TemplatesPage";
 
 /* ── ATS Score Bar ── */
 function AtsBar({ score }) {
@@ -27,9 +28,31 @@ import { useState } from "react";
 
 /* ── Dashboard Page ── */
 function Dashboard() {
+  const navigate = useNavigate();
   const userEmail = localStorage.getItem("userEmail") || "anonymous";
   const resumesKey = `savedResumes_${userEmail}`;
   const userName = localStorage.getItem("userName") || "Sri Aarush";
+
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+
+  const coverLettersKey = `savedCoverLetters_${userEmail}`;
+  const [coverLetters, setCoverLetters] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(coverLettersKey) || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const handleDeleteCoverLetter = (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this cover letter?")) {
+      const updated = coverLetters.filter(c => c.id !== id);
+      setCoverLetters(updated);
+      localStorage.setItem(coverLettersKey, JSON.stringify(updated));
+    }
+  };
 
   const [resumes, setResumes] = useState(() => {
     const userEmail = localStorage.getItem("userEmail") || "anonymous";
@@ -37,7 +60,13 @@ function Dashboard() {
 
     // Gather all resumes from all accounts/guest/legacy keys in local storage to prevent any data loss
     const keys = Object.keys(localStorage);
-    let allResumes = [];
+    const resumeMap = {};
+
+    const legacyTemplateMap = {
+      minimal: "minimalist",
+      corporate: "executive",
+      tech: "modern"
+    };
 
     keys.forEach(k => {
       if (k === "savedResumes" || k.startsWith("savedResumes_")) {
@@ -45,8 +74,19 @@ function Dashboard() {
           const list = JSON.parse(localStorage.getItem(k) || "[]");
           if (Array.isArray(list)) {
             list.forEach(r => {
-              if (r && r.id && !allResumes.some(existing => existing.id === r.id)) {
-                allResumes.push(r);
+              if (r && r.id) {
+                // Migrate legacy template name if present
+                if (r.data && r.data.template && legacyTemplateMap[r.data.template]) {
+                  r.data.template = legacyTemplateMap[r.data.template];
+                }
+
+                const existing = resumeMap[r.id];
+                const rLastEdited = r.lastEdited || 0;
+                const existingLastEdited = existing ? (existing.lastEdited || 0) : -1;
+                
+                if (!existing || rLastEdited > existingLastEdited) {
+                  resumeMap[r.id] = r;
+                }
               }
             });
           }
@@ -56,6 +96,8 @@ function Dashboard() {
       }
     });
 
+    const allResumes = Object.values(resumeMap);
+
     // Save the combined list to the active user's key
     if (allResumes.length > 0) {
       localStorage.setItem(resumesKey, JSON.stringify(allResumes));
@@ -63,7 +105,7 @@ function Dashboard() {
 
     return allResumes.map(r => ({
       ...r,
-      lastEdited: r.lastEdited || Date.now()
+      lastEdited: (!r.lastEdited || r.lastEdited <= 1000) ? Date.now() : r.lastEdited
     }));
   });
 
@@ -73,7 +115,21 @@ function Dashboard() {
     if (window.confirm("Are you sure you want to delete this resume?")) {
       const updated = resumes.filter(r => r.id !== id);
       setResumes(updated);
-      localStorage.setItem(resumesKey, JSON.stringify(updated));
+      
+      // Remove from all keys starting with savedResumes to prevent resurrection on reload
+      Object.keys(localStorage).forEach(k => {
+        if (k === "savedResumes" || k.startsWith("savedResumes_")) {
+          try {
+            const list = JSON.parse(localStorage.getItem(k) || "[]");
+            if (Array.isArray(list)) {
+              const filtered = list.filter(r => r.id !== id);
+              localStorage.setItem(k, JSON.stringify(filtered));
+            }
+          } catch (err) {
+            // ignore invalid JSON
+          }
+        }
+      });
     }
   };
 
@@ -102,15 +158,15 @@ function Dashboard() {
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
           <p className="text-slate-400 text-sm mt-1">Welcome back, {userName}</p>
         </div>
-        <Link
-          to="/builder/new"
+        <button
+          onClick={() => setShowTemplateModal(true)}
           className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-accent to-accent-violet text-white rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-accent/20 transition-all duration-300 hover:-translate-y-0.5"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           New resume
-        </Link>
+        </button>
       </div>
 
       {/* AI Banner */}
@@ -195,9 +251,9 @@ function Dashboard() {
         ))}
 
         {/* Create New Card */}
-        <Link
-          to="/builder/new"
-          className="glass-card p-5 border-dashed border-white/[0.08] hover:border-accent/30 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-center min-h-[260px] group cursor-pointer"
+        <button
+          onClick={() => setShowTemplateModal(true)}
+          className="glass-card p-5 border-dashed border-white/[0.08] hover:border-accent/30 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-center min-h-[260px] group cursor-pointer text-center w-full"
         >
           <div className="w-12 h-12 rounded-2xl bg-white/[0.04] group-hover:bg-accent/10 flex items-center justify-center mb-3 transition-colors">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-slate-500 group-hover:text-accent-light transition-colors">
@@ -207,9 +263,79 @@ function Dashboard() {
           <span className="text-sm text-slate-500 group-hover:text-slate-300 transition-colors font-medium">
             Create new resume
           </span>
+        </button>
+      </div>
+
+      {/* My Cover Letters Section */}
+      <div className="flex items-center justify-between mt-12 mb-5">
+        <h2 className="text-lg font-semibold text-white">My cover letters</h2>
+        <Link to="/cover-letter" className="text-sm text-accent-light hover:text-white transition-colors">
+          Create Letter →
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-3 gap-5">
+        {/* Cover Letter Cards */}
+        {coverLetters.map((cl) => (
+          <Link
+            key={cl.id}
+            to={`/cover-letter?id=${cl.id}`}
+            className="glass-card p-5 hover:-translate-y-1 transition-all duration-300 hover:border-white/[0.12] group cursor-pointer relative"
+          >
+            {/* Delete Cover Letter Button */}
+            <button
+              onClick={(e) => handleDeleteCoverLetter(e, cl.id)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/25 z-20"
+              title="Delete Cover Letter"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+            {/* Preview Thumbnail */}
+            <div className="w-full h-36 rounded-lg bg-white/[0.04] border border-white/[0.06] mb-4 flex flex-col justify-between p-4 group-hover:border-accent/30 transition-colors overflow-hidden relative">
+              <span className="text-[9px] uppercase font-extrabold tracking-wider text-accent-light px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 w-fit">
+                {cl.tone || "Professional"}
+              </span>
+              <p className="text-[11px] text-slate-400 italic line-clamp-3 leading-relaxed mt-2 select-none">
+                {cl.content ? cl.content.slice(0, 150) + "..." : "Drafting in progress..."}
+              </p>
+            </div>
+
+            <h3 className="font-semibold text-white text-sm mb-1 truncate">{cl.name || "Untitled Letter"}</h3>
+            <p className="text-xs text-slate-500">
+              {cl.companyName || "No Company"} · Edited {new Date(cl.lastEdited).toLocaleDateString()}
+            </p>
+          </Link>
+        ))}
+
+        {/* Create New Card */}
+        <Link
+          to="/cover-letter"
+          className="glass-card p-5 border-dashed border-white/[0.08] hover:border-accent/30 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-center min-h-[260px] group cursor-pointer text-center w-full"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-white/[0.04] group-hover:bg-accent/10 flex items-center justify-center mb-3 transition-colors">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-slate-500 group-hover:text-accent-light transition-colors">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </div>
+          <span className="text-sm text-slate-500 group-hover:text-slate-300 transition-colors font-medium">
+            Create new cover letter
+          </span>
         </Link>
       </div>
       </div>
+
+      {/* Template Picker Modal */}
+      {showTemplateModal && (
+        <TemplatePickerModal
+          onClose={() => setShowTemplateModal(false)}
+          onSelect={(templateId) => {
+            setShowTemplateModal(false);
+            navigate(`/builder/new?template=${templateId}`);
+          }}
+        />
+      )}
     </div>
   );
 }

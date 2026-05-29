@@ -18,7 +18,7 @@ function Achievements({ resumeData, setResumeData }) {
   const updateAchievement = (index, field, value) => {
     setResumeData((prev) => {
       const updated = [...prev.achievements];
-      updated[index][field] = value;
+      updated[index] = { ...updated[index], [field]: value };
 
       return {
         ...prev,

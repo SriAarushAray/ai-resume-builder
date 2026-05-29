@@ -14,13 +14,44 @@ function Personal({ resumeData, setResumeData }) {
   }, [aiSummaryPreview]);
 
   const handleChange = (e) => {
-    setResumeData({
-      ...resumeData,
+    setResumeData(prev => ({
+      ...prev,
       personal: {
-        ...resumeData.personal,
+        ...(prev.personal || {}),
         [e.target.name]: e.target.value,
       },
-    });
+    }));
+  };
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Image size should be less than 2MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setResumeData(prev => ({
+          ...prev,
+          personal: {
+            ...(prev.personal || {}),
+            photo: reader.result
+          }
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setResumeData(prev => ({
+      ...prev,
+      personal: {
+        ...(prev.personal || {}),
+        photo: null
+      }
+    }));
   };
 
   const handleOptimizeSummary = async () => {
@@ -56,13 +87,13 @@ function Personal({ resumeData, setResumeData }) {
   };
 
   const handleApplySummary = () => {
-    setResumeData({
-      ...resumeData,
+    setResumeData(prev => ({
+      ...prev,
       personal: {
-        ...resumeData.personal,
+        ...(prev.personal || {}),
         summary: aiSummaryPreview,
       },
-    });
+    }));
     setAiSummaryPreview("");
   };
 
@@ -75,6 +106,64 @@ function Personal({ resumeData, setResumeData }) {
       <h3 className="text-2xl font-semibold mb-6 text-left text-gray-900 tracking-tight">
         Personal Information
       </h3>
+
+      {/* Photo Upload Section */}
+      {(() => {
+        const legacyTemplateMap = {
+          minimal: "minimalist",
+          corporate: "executive",
+          tech: "modern"
+        };
+        const rawTemplate = resumeData.template || "minimalist";
+        const template = legacyTemplateMap[rawTemplate] || rawTemplate;
+        const needsPhoto = template === "photo-header" || template === "photo-sidebar";
+        
+        if (!needsPhoto) return null;
+
+        return (
+          <div className="mb-6 flex items-center gap-6 bg-slate-50 p-4 rounded-xl border border-gray-200">
+            <div className="relative shrink-0">
+              {resumeData.personal?.photo ? (
+                <img
+                  src={resumeData.personal.photo}
+                  alt="Profile"
+                  className="w-24 h-24 rounded-full object-cover border-2 border-blue-500 shadow-md"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-slate-200 border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400">
+                  <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 text-left">
+              <span className="text-sm font-semibold text-gray-800">Profile Photo</span>
+              <span className="text-xs text-gray-500">Recommended for Photo templates. Max size 2MB.</span>
+              <div className="flex gap-3 mt-1">
+                <label className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm hover:shadow transition-all cursor-pointer">
+                  Upload Photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                </label>
+                {resumeData.personal?.photo && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    className="px-4 py-2 bg-white hover:bg-gray-50 text-red-600 border border-gray-200 rounded-lg text-xs font-semibold shadow-sm transition-all"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-2 gap-6">
         {/* Full Name */}
@@ -129,6 +218,62 @@ function Personal({ resumeData, setResumeData }) {
             value={resumeData.personal.location}
             onChange={handleChange}
             placeholder="Enter your location"
+            className="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
+          />
+        </div>
+
+        {/* LinkedIn */}
+        <div className="flex flex-col">
+          <label className="mb-2 text-sm font-medium text-gray-700">
+            LinkedIn Profile URL
+          </label>
+          <input
+            name="linkedin"
+            value={resumeData.personal.linkedin || ""}
+            onChange={handleChange}
+            placeholder="e.g. linkedin.com/in/username"
+            className="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
+          />
+        </div>
+
+        {/* GitHub */}
+        <div className="flex flex-col">
+          <label className="mb-2 text-sm font-medium text-gray-700">
+            GitHub Profile URL
+          </label>
+          <input
+            name="github"
+            value={resumeData.personal.github || ""}
+            onChange={handleChange}
+            placeholder="e.g. github.com/username"
+            className="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
+          />
+        </div>
+
+        {/* LeetCode */}
+        <div className="flex flex-col">
+          <label className="mb-2 text-sm font-medium text-gray-700">
+            LeetCode Profile URL
+          </label>
+          <input
+            name="leetcode"
+            value={resumeData.personal.leetcode || ""}
+            onChange={handleChange}
+            placeholder="e.g. leetcode.com/username"
+            className="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
+          />
+        </div>
+
+        {/* Portfolio */}
+        <div className="flex flex-col">
+          <label className="mb-2 text-sm font-medium text-gray-700">
+            Portfolio / Website URL
+          </label>
+          <input
+            name="portfolio"
+            value={resumeData.personal.portfolio || ""}
+            onChange={handleChange}
+            placeholder="e.g. portfolio.com"
             className="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
           />
         </div>

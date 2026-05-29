@@ -13,7 +13,7 @@ function RobotProgress({ steps, currentStep, onStepClick }) {
   const frameIndex = getFrameIndex(currentStep);
 
   return (
-    <div className="mb-8 w-full max-w-3xl mx-auto px-4">
+    <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md pt-6 pb-4 border-b border-slate-100 mb-6 w-full max-w-3xl mx-auto px-4">
       {/* Inline styles for walking animation */}
       <style>{`
         @keyframes walk-front {

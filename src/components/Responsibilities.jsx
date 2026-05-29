@@ -4,32 +4,28 @@ function Responsibilities({ resumeData, setResumeData }) {
   const responsibilities = resumeData.responsibilities || [];
 
   const addResponsibility = () => {
-    setResumeData({
-      ...resumeData,
+    setResumeData(prev => ({
+      ...prev,
       responsibilities: [
-        ...responsibilities,
+        ...(prev.responsibilities || []),
         { role: "", organization: "", startDate: "", endDate: "", description: "" },
       ],
-    });
+    }));
   };
 
   const updateResponsibility = (index, field, value) => {
-    const updated = [...responsibilities];
-    updated[index][field] = value;
-
-    setResumeData({
-      ...resumeData,
-      responsibilities: updated,
+    setResumeData(prev => {
+      const updated = [...(prev.responsibilities || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, responsibilities: updated };
     });
   };
 
   const removeResponsibility = (index) => {
-    const updated = responsibilities.filter((_, i) => i !== index);
-
-    setResumeData({
-      ...resumeData,
-      responsibilities: updated,
-    });
+    setResumeData(prev => ({
+      ...prev,
+      responsibilities: (prev.responsibilities || []).filter((_, i) => i !== index),
+    }));
   };
 
   return (
