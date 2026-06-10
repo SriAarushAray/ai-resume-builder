@@ -110,11 +110,22 @@ function ResumeBuilder() {
   const [showLayoutSettings, setShowLayoutSettings] = useState(false);
   const [showTypographySettings, setShowTypographySettings] = useState(false);
 
-  // RESUME NAME STATE
-  const [resumeName, setResumeName] = useState("Untitled Resume");
-
   const userEmail = localStorage.getItem("userEmail") || "anonymous";
   const resumesKey = `savedResumes_${userEmail}`;
+
+  // RESUME NAME STATE
+  const [resumeName, setResumeName] = useState(() => {
+    try {
+      const savedResumes = JSON.parse(localStorage.getItem(resumesKey) || "[]");
+      // Use URL search params if id is not fully loaded yet, but try finding existing first
+      const pathParts = window.location.pathname.split('/');
+      const currentId = pathParts[pathParts.length - 1] || id;
+      const existing = savedResumes.find(r => r.id === currentId);
+      return existing && existing.name ? existing.name : "Untitled Resume";
+    } catch {
+      return "Untitled Resume";
+    }
+  });
 
   // RESUME DATA STATE
   const [resumeData, setResumeData] = useState(() => {
@@ -199,6 +210,22 @@ function ResumeBuilder() {
   // DYNAMIC ATS SCORING & SUGGESTIONS
   const score = useMemo(() => calculateAtsScore(resumeData), [resumeData]);
   const suggestions = useMemo(() => getAtsSuggestions(resumeData), [resumeData]);
+
+  const groupedSuggestions = useMemo(() => {
+    const groups = {
+      "Content": [],
+      "Sections": [],
+      "ATS Essentials": []
+    };
+    suggestions.forEach(s => {
+      const type = s.type || "Content";
+      if (!groups[type]) {
+        groups[type] = [];
+      }
+      groups[type].push(s);
+    });
+    return groups;
+  }, [suggestions]);
 
   // SAVE TO LOCAL STORAGE HELPER
   const saveResume = () => {
@@ -431,14 +458,14 @@ function ResumeBuilder() {
                   </div>
 
                   {/* Suggestions checklist */}
-                  <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm bg-slate-50 p-5 space-y-3">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">
+                  <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm bg-slate-50 p-5 space-y-4 text-left">
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1">
                       Optimize Checklist ({suggestions.length} items left)
                     </span>
 
                     {suggestions.length === 0 ? (
                       <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 font-bold">
                           ✓
                         </div>
                         <div>
@@ -447,31 +474,55 @@ function ResumeBuilder() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                        {suggestions.map((s) => {
-                          const impactColor =
-                            s.impact === "High"
-                              ? "bg-red-50 text-red-700 border-red-200"
-                              : s.impact === "Medium"
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-blue-50 text-blue-700 border-blue-200";
-
+                      <div className="space-y-4 max-h-[360px] overflow-y-auto pr-1">
+                        {Object.entries(groupedSuggestions).map(([category, items]) => {
+                          const hasIssues = items.length > 0;
                           return (
-                            <div
-                              key={s.id}
-                              className="flex items-start gap-3 p-2.5 bg-white border border-gray-200 rounded-xl hover:border-indigo-200 transition-colors shadow-xs"
-                            >
-                              <div className="mt-0.5 shrink-0 select-none">
-                                <div className="w-4 h-4 rounded-full border border-gray-300 flex items-center justify-center text-[10px] font-bold text-indigo-500 bg-slate-50">
-                                  !
+                            <div key={category} className="space-y-2 border-b border-gray-200 pb-3 last:border-0 last:pb-0">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">
+                                  {category}
+                                </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  hasIssues 
+                                    ? "bg-amber-100 text-amber-800 border border-amber-200" 
+                                    : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                }`}>
+                                  {hasIssues ? `${items.length} Issue${items.length > 1 ? 's' : ''}` : "✓ No Issues"}
+                                </span>
+                              </div>
+                              
+                              {hasIssues && (
+                                <div className="space-y-2 pl-1.5 mt-1">
+                                  {items.map((s) => {
+                                    const impactColor =
+                                      s.impact === "High"
+                                        ? "bg-red-50 text-red-700 border-red-200"
+                                        : s.impact === "Medium"
+                                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                                        : "bg-blue-50 text-blue-700 border-blue-200";
+
+                                    return (
+                                      <div
+                                        key={s.id}
+                                        className="flex items-start gap-2.5 p-2 bg-white border border-gray-200 rounded-xl hover:border-indigo-200 transition-colors shadow-xs"
+                                      >
+                                        <div className="mt-0.5 shrink-0 select-none">
+                                          <div className="w-3.5 h-3.5 rounded-full border border-gray-300 flex items-center justify-center text-[9px] font-bold text-indigo-500 bg-slate-50">
+                                            !
+                                          </div>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[11px] text-slate-700 font-medium leading-relaxed">{s.text}</p>
+                                        </div>
+                                        <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border shrink-0 uppercase tracking-wide ${impactColor}`}>
+                                          {s.impact}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-slate-700 font-medium leading-relaxed">{s.text}</p>
-                              </div>
-                              <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border shrink-0 uppercase tracking-wide ${impactColor}`}>
-                                {s.impact}
-                              </span>
+                              )}
                             </div>
                           );
                         })}

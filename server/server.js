@@ -918,6 +918,9 @@ ${description ? `Additional context: ${description}` : ""}
 
 Requirements:
 - Each bullet point must start with a strong, active past-tense action verb (e.g. "Developed", "Optimized", "Led", "Reduced", "Architected", "Implemented").
+- Do NOT start multiple bullet points with the same action verb. Vary the action verbs used (use a unique verb for each bullet point).
+- Vary the vocabulary and avoid repeating words or phrases across bullet points.
+- Do NOT include any categories, subheadings, labels, prefixes, or bold titles at the beginning of the bullet points (e.g. do NOT output "**Technical Development:** Developed...", instead output simply "Developed..."). Each bullet point must start directly with the past-tense action verb, with no introduction.
 - Make them ATS-friendly, results-oriented, and quantified where possible (e.g. "reduced load time by 40%", "built a system serving 1000+ users").
 - Keep each point concise — one impactful sentence each.
 - Do NOT include vague language like "helped with", "worked on", "was involved in".
@@ -1040,7 +1043,7 @@ Tasks:
 1. Compare the skills, experience, and projects in the resume against the requirements in the Job Description.
 2. Identify which core skills/technologies from the Job Description are "matched" (present in the resume) vs "missing" (required/recommended in the JD but absent or weak in the resume).
 3. Compute a real ATS Match Score (0 to 100) representing how well the candidate's profile matches the JD.
-4. Review every bullet point, summary, and description in the resume's experiences and projects, and generate an optimized "tailored" version. Each optimized bullet should start with a strong action verb, incorporate relevant missing keywords from the JD naturally, and include a realistic quantitative metric (e.g. "improving efficiency by 20%") matching the context of the work.
+4. Review every bullet point, summary, and description in the resume's experiences and projects, and generate an optimized "tailored" version. Each optimized bullet must start directly with a strong, past-tense action verb. Do NOT start multiple bullet points with the same verb. Vary the vocabulary, avoid repeating words or phrases across bullets, and do NOT include any subheadings, bold titles, categories, or prefixes at the beginning of the bullet points (e.g. do NOT output "**Optimization:** Optimized...", instead output simply "Optimized..."). Each bullet should include a realistic quantitative metric (e.g. "improving efficiency by 20%") matching the context of the work.
 5. Return the result in raw JSON format. The JSON must have exactly this structure:
 {
   "score": 85,

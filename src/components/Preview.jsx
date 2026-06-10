@@ -335,7 +335,7 @@ function TwoColumnLayout({ resumeData, template, tpl, lineSpacing, sectionSpacin
               );
             }
 
-            if (sectionKey === "responsibility" && filteredResponsibilities.length > 0) {
+            if ((sectionKey === "responsibility" || sectionKey === "responsibilities") && filteredResponsibilities.length > 0) {
               return (
                 <div key="responsibility" style={{ marginBottom: `${sectionSpacing}px` }}>
                   <h3 className={tpl.sectionHeader}>Responsibilities</h3>
@@ -359,6 +359,141 @@ function TwoColumnLayout({ resumeData, template, tpl, lineSpacing, sectionSpacin
     </div>
   );
 }
+
+const getBlockText = (blockKey, resumeData) => {
+  const {
+    personal = {},
+    skills = [],
+    groupedSkills = [],
+    showGroupedSkills = false,
+    education = {},
+    experiences = [],
+    projects = [],
+    achievements = [],
+    certificates = [],
+    publications = [],
+    responsibilities = []
+  } = resumeData || {};
+
+  const lines = [];
+
+  if (blockKey === "personal") {
+    lines.push(personal.fullName || "");
+    const contact = [personal.email, personal.phone, personal.location].filter(Boolean);
+    const links = [personal.linkedin, personal.github, personal.leetcode, personal.portfolio].filter(Boolean);
+    if (contact.length > 0) lines.push(contact.join(" | "));
+    if (links.length > 0) lines.push(links.join(" | "));
+  } else if (blockKey === "summary") {
+    if (personal.summary?.trim()) {
+      lines.push("PROFESSIONAL SUMMARY");
+      lines.push(personal.summary);
+    }
+  } else if (blockKey === "skills") {
+    lines.push("TECHNICAL SKILLS");
+    if (showGroupedSkills && groupedSkills?.length > 0) {
+      groupedSkills.forEach(g => {
+        lines.push(`${g.category}: ${g.items.join(", ")}`);
+      });
+    } else {
+      lines.push(skills.filter(Boolean).join(", "));
+    }
+  } else if (blockKey === "education") {
+    if (education.college?.trim()) {
+      lines.push("EDUCATION");
+      lines.push(`${education.college} - ${education.location || ""}`);
+      lines.push(`${education.degree || ""}${education.course ? ` in ${education.course}` : ""}`);
+      if (education.year || education.gpa) {
+        lines.push(`${education.year || ""} ${education.gpa ? `GPA: ${education.gpa}` : ""}`);
+      }
+    }
+  } else if (blockKey.startsWith("experience-")) {
+    const index = parseInt(blockKey.split("-")[1], 10);
+    const filteredExp = experiences.filter(
+      (experience) =>
+        experience?.company?.trim() ||
+        experience?.role?.trim() ||
+        experience?.duration?.trim() ||
+        experience?.description?.trim(),
+    );
+    const exp = filteredExp[index];
+    if (exp) {
+      if (index === 0) lines.push("EXPERIENCE");
+      lines.push(`${exp.company || ""} - ${exp.role || ""} (${exp.duration || ""})`);
+      if (Array.isArray(exp.points)) {
+        exp.points.filter(Boolean).forEach(p => lines.push(`• ${p}`));
+      } else if (exp.description) {
+        lines.push(exp.description);
+      }
+    }
+  } else if (blockKey.startsWith("project-")) {
+    const index = parseInt(blockKey.split("-")[1], 10);
+    const filteredProj = projects.filter(
+      (project) =>
+        project?.title?.trim() ||
+        project?.technologies?.trim() ||
+        (Array.isArray(project?.points) && project.points.some((point) => point?.trim())),
+    );
+    const proj = filteredProj[index];
+    if (proj) {
+      if (index === 0) lines.push("PROJECTS");
+      lines.push(`${proj.title || ""} ${proj.technologies ? `| ${proj.technologies}` : ""} (${proj.duration || ""})`);
+      if (proj.link) lines.push(proj.link);
+      if (Array.isArray(proj.points)) {
+        proj.points.filter(Boolean).forEach(p => lines.push(`• ${p}`));
+      }
+    }
+  } else if (blockKey.startsWith("achievement-")) {
+    const index = parseInt(blockKey.split("-")[1], 10);
+    const filteredAch = achievements.filter(
+      (achievement) => achievement?.title?.trim() || achievement?.description?.trim(),
+    );
+    const ach = filteredAch[index];
+    if (ach) {
+      if (index === 0) lines.push("ACHIEVEMENTS");
+      lines.push(`${ach.title || ""} (${ach.date || ""})`);
+      if (ach.description) lines.push(ach.description);
+    }
+  } else if (blockKey.startsWith("certificate-")) {
+    const index = parseInt(blockKey.split("-")[1], 10);
+    const filteredCert = certificates.filter(
+      (certificate) =>
+        certificate?.name?.trim() ||
+        certificate?.issuer?.trim() ||
+        certificate?.year?.trim() ||
+        certificate?.link?.trim(),
+    );
+    const cert = filteredCert[index];
+    if (cert) {
+      if (index === 0) lines.push("CERTIFICATIONS");
+      lines.push(`${cert.name || ""} - ${cert.issuer || ""} (${cert.year || ""})`);
+      if (cert.link) lines.push(cert.link);
+    }
+  } else if (blockKey.startsWith("publication-")) {
+    const index = parseInt(blockKey.split("-")[1], 10);
+    const filteredPub = publications.filter(
+      (pub) => pub?.title?.trim() || pub?.date?.trim() || pub?.description?.trim(),
+    );
+    const pub = filteredPub[index];
+    if (pub) {
+      if (index === 0) lines.push("PUBLICATIONS");
+      lines.push(`${pub.title || ""} (${pub.date || ""})`);
+      if (pub.description) lines.push(pub.description);
+    }
+  } else if (blockKey.startsWith("responsibility-")) {
+    const index = parseInt(blockKey.split("-")[1], 10);
+    const filteredResp = responsibilities.filter(
+      (resp) => resp?.role?.trim() || resp?.organization?.trim() || resp?.description?.trim(),
+    );
+    const resp = filteredResp[index];
+    if (resp) {
+      if (index === 0) lines.push("RESPONSIBILITIES");
+      lines.push(`${resp.role || ""} - ${resp.organization || ""} (${resp.duration || ""})`);
+      if (resp.description) lines.push(resp.description);
+    }
+  }
+
+  return lines;
+};
 
 function Preview({ resumeData, resumeName, layoutSettings }) {
   const containerRef = useRef(null);
@@ -449,7 +584,7 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
         headerClass: "text-left border-b-2 border-blue-500 pb-3 mb-4",
         nameClass: "text-3xl font-black tracking-tight text-blue-600",
         contactClass: "text-[11px] text-slate-500 flex flex-wrap gap-x-3 mt-1",
-        sectionHeader: "font-black text-xs text-blue-600 uppercase tracking-widest border-l-4 border-blue-500 pl-2 mb-2",
+        sectionHeader: "font-black text-xs text-blue-600 uppercase tracking-widest border-l-4 border-blue-500 pl-2 mb-1.5",
         subHeader: "font-bold text-slate-900 text-xs",
         dateClass: "text-blue-500 text-xs font-bold",
         bulletClass: "list-disc ml-5 text-xs text-slate-700 mt-1",
@@ -460,14 +595,14 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
       return {
         fontClass: "font-serif text-gray-900 leading-normal tracking-wide text-center",
         pageBg: "bg-white p-8 border-[6px] border-slate-200",
-        headerClass: "text-center pb-2 mb-4 border-b-2 border-double border-slate-900",
-        nameClass: "text-2xl font-bold uppercase tracking-widest text-slate-950",
+        headerClass: "text-center pb-2 mb-4 border-b-2 border-double border-slate-350",
+        nameClass: "text-2xl font-bold uppercase tracking-widest text-slate-955",
         contactClass: "text-[11px] text-slate-700 flex flex-wrap justify-center gap-x-4 mt-1.5 italic",
-        sectionHeader: "font-bold border-b border-slate-900 pb-0.5 mb-2.5 text-center uppercase tracking-widest text-xs text-slate-950",
+        sectionHeader: "font-bold border-b border-slate-800 pb-2 mb-1 text-center uppercase tracking-widest text-xs text-slate-955",
         subHeader: "font-bold text-slate-950 text-xs uppercase",
         dateClass: "text-slate-800 text-xs font-semibold uppercase italic",
         bulletClass: "list-disc ml-5 text-xs text-slate-850 mt-1.5",
-        divider: "border-slate-300 mt-2",
+        divider: "border-slate-250 mt-2",
         linkClass: "text-slate-900 hover:underline font-bold"
       };
     } else if (template === "creative") {
@@ -477,7 +612,7 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
         headerClass: "bg-slate-900 text-white p-6 -mx-8 -mt-8 mb-6 text-center border-b-4 border-violet-500",
         nameClass: "text-3xl font-extrabold tracking-tight text-white",
         contactClass: "text-[11px] text-slate-300 flex flex-wrap justify-center gap-x-3 mt-2",
-        sectionHeader: "font-extrabold text-xs uppercase tracking-wider bg-violet-100 text-violet-750 px-3 py-1.5 rounded-lg inline-block mb-3 shadow-sm",
+        sectionHeader: "font-extrabold text-xs uppercase tracking-wider bg-violet-100 text-violet-750 px-3 py-1.5 rounded-lg inline-block mb-1.5 shadow-sm",
         subHeader: "font-bold text-slate-900 text-xs",
         dateClass: "text-violet-600 text-xs font-bold bg-violet-50 px-2 py-0.5 rounded",
         bulletClass: "list-disc ml-5 text-xs text-slate-700 mt-1",
@@ -491,9 +626,9 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
         headerClass: "text-left border-b border-slate-300 pb-4 mb-4 flex items-center gap-6",
         nameClass: "text-3xl font-extrabold text-slate-900 tracking-tight",
         contactClass: "text-[11px] text-slate-600 flex flex-wrap gap-x-3 mt-1",
-        sectionHeader: "font-bold text-xs text-slate-900 uppercase tracking-wide border-b border-slate-300 pb-1 mb-2",
+        sectionHeader: "font-bold text-xs text-slate-900 uppercase tracking-wide border-b border-slate-300 pb-2 mb-1",
         subHeader: "font-bold text-slate-900 text-xs",
-        dateClass: "text-slate-500 text-xs font-medium",
+        dateClass: "text-slate-550 text-xs font-medium",
         bulletClass: "list-disc ml-5 text-xs text-slate-700 mt-1",
         divider: "border-slate-200 mt-2",
         linkClass: "text-blue-600 hover:underline font-medium"
@@ -505,10 +640,10 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
         headerClass: "text-center pb-3 mb-4 border-b-2 border-emerald-500",
         nameClass: "text-3xl font-bold tracking-tight text-emerald-800",
         contactClass: "text-[11px] text-slate-500 flex flex-wrap justify-center gap-x-3 mt-1",
-        sectionHeader: "font-bold text-xs text-emerald-800 uppercase tracking-widest border-l-4 border-emerald-500 pl-2 mb-2",
+        sectionHeader: "font-bold text-xs text-emerald-800 uppercase tracking-widest border-l-4 border-emerald-500 pl-2 mb-1.5",
         subHeader: "font-bold text-slate-900 text-xs",
         dateClass: "text-emerald-600 text-xs font-semibold",
-        bulletClass: "list-disc ml-5 text-xs text-slate-750 mt-1",
+        bulletClass: "list-disc ml-5 text-xs text-slate-755 mt-1",
         divider: "border-slate-200 mt-2",
         linkClass: "text-emerald-700 hover:underline font-medium"
       };
@@ -519,9 +654,9 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
         headerClass: "text-left pb-4 mb-4 border-b border-indigo-150",
         nameClass: "text-3xl font-extrabold tracking-tight text-indigo-950",
         contactClass: "text-[11px] text-indigo-650 flex flex-wrap gap-x-3 mt-1.5",
-        sectionHeader: "font-extrabold text-xs text-indigo-900 uppercase tracking-wider mb-3 bg-indigo-50 px-2.5 py-1 rounded inline-block",
+        sectionHeader: "font-extrabold text-xs text-indigo-900 uppercase tracking-wider mb-1.5 bg-indigo-50 px-2.5 py-1 rounded inline-block",
         subHeader: "font-bold text-slate-900 text-xs",
-        dateClass: "text-indigo-650 text-xs font-semibold bg-indigo-50 px-1.5 py-0.5 rounded",
+        dateClass: "text-indigo-650 text-xs font-semibold bg-indigo-55 px-1.5 py-0.5 rounded",
         bulletClass: "list-disc ml-5 text-xs text-slate-700 mt-1",
         divider: "border-indigo-100 mt-2",
         linkClass: "text-indigo-650 hover:underline font-medium"
@@ -533,8 +668,8 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
         headerClass: "mb-3",
         nameClass: "text-2xl font-extrabold text-teal-950 tracking-tight",
         contactClass: "text-[10px] text-slate-300 flex flex-col gap-1.5",
-        sectionHeader: "font-bold text-xs text-teal-900 uppercase tracking-wider border-b border-teal-800/20 pb-0.5 mb-2",
-        subHeader: "font-bold text-slate-950 text-xs",
+        sectionHeader: "font-bold text-xs text-teal-900 uppercase tracking-wider border-b border-teal-800/20 pb-2 mb-1",
+        subHeader: "font-bold text-slate-955 text-xs",
         dateClass: "text-teal-650 text-[10px] font-semibold",
         bulletClass: "list-disc ml-4 text-[11px] text-slate-700 mt-0.5",
         divider: "border-teal-900/10 mt-1.5",
@@ -547,8 +682,8 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
         headerClass: "mb-3",
         nameClass: "text-2xl font-bold text-slate-900 tracking-tight",
         contactClass: "text-[10px] text-slate-500 flex flex-col gap-1.5",
-        sectionHeader: "font-bold text-xs text-slate-850 uppercase tracking-wider border-b border-slate-350 pb-0.5 mb-2",
-        subHeader: "font-bold text-slate-950 text-xs",
+        sectionHeader: "font-bold text-xs text-slate-850 uppercase tracking-wider border-b border-slate-350 pb-2 mb-1",
+        subHeader: "font-bold text-slate-955 text-xs",
         dateClass: "text-slate-550 text-[10px] font-semibold",
         bulletClass: "list-disc ml-4 text-[11px] text-slate-700 mt-0.5",
         divider: "border-slate-200 mt-1.5",
@@ -562,11 +697,11 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
         headerClass: "text-center mb-4",
         nameClass: "text-2xl font-bold text-gray-950",
         contactClass: "text-xs text-gray-600 flex flex-wrap justify-center gap-x-2 mt-1",
-        sectionHeader: "font-bold border-b border-gray-900 pb-1 mb-2 uppercase tracking-wide text-xs text-gray-900",
+        sectionHeader: "font-bold border-b border-slate-800 pb-2 mb-1 uppercase tracking-wide text-xs text-gray-900",
         subHeader: "font-bold text-slate-900 text-xs",
         dateClass: "text-gray-600 text-xs font-semibold",
         bulletClass: "list-disc ml-5 text-xs text-slate-700 mt-1",
-        divider: "border-gray-300 mt-2",
+        divider: "border-slate-200 mt-2",
         linkClass: "text-blue-600 hover:underline font-medium"
       };
     }
@@ -607,41 +742,54 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
 
     const sectionBuilders = {
       personal: () => {
-        const contactDetails = [];
-        if (personal.email) contactDetails.push(personal.email);
-        if (personal.phone) contactDetails.push(personal.phone);
-        if (personal.location) contactDetails.push(personal.location);
+        const cleanUrl = (url) => {
+          if (!url) return "";
+          return url.replace(/https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+        };
 
-        const socialLinks = [];
+        const headerItems = [];
+        if (personal.phone) {
+          headerItems.push(<span key="phone">{personal.phone}</span>);
+        }
+        if (personal.email) {
+          headerItems.push(
+            <a key="email" href={`mailto:${personal.email}`} className="hover:underline">
+              {personal.email}
+            </a>
+          );
+        }
+        if (personal.location && template !== "minimalist" && template !== "executive") {
+          headerItems.push(<span key="location">{personal.location}</span>);
+        }
         if (personal.linkedin) {
           const url = personal.linkedin.startsWith("http") ? personal.linkedin : `https://${personal.linkedin}`;
-          socialLinks.push(
+          headerItems.push(
             <a key="linkedin" href={url} target="_blank" rel="noopener noreferrer" className={tpl.linkClass}>
-              LinkedIn
+              {cleanUrl(personal.linkedin)}
             </a>
           );
         }
         if (personal.github) {
           const url = personal.github.startsWith("http") ? personal.github : `https://${personal.github}`;
-          socialLinks.push(
+          headerItems.push(
             <a key="github" href={url} target="_blank" rel="noopener noreferrer" className={tpl.linkClass}>
-              GitHub
+              {cleanUrl(personal.github)}
             </a>
           );
         }
         if (personal.leetcode) {
           const url = personal.leetcode.startsWith("http") ? personal.leetcode : `https://${personal.leetcode}`;
-          socialLinks.push(
+          headerItems.push(
             <a key="leetcode" href={url} target="_blank" rel="noopener noreferrer" className={tpl.linkClass}>
-              LeetCode
+              {cleanUrl(personal.leetcode)}
             </a>
           );
         }
         if (personal.portfolio) {
           const url = personal.portfolio.startsWith("http") ? personal.portfolio : `https://${personal.portfolio}`;
-          socialLinks.push(
+          headerItems.push(
             <a key="portfolio" href={url} target="_blank" rel="noopener noreferrer" className={tpl.linkClass}>
-              Portfolio
+              {cleanUrl(personal.portfolio)}
             </a>
           );
         }
@@ -660,21 +808,11 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
               )}
               <div className={`flex-1 ${tpl.headerClass.includes("text-center") ? "text-center" : "text-left"}`}>
                 <h1 className={tpl.nameClass}>{personal.fullName || "Your Name"}</h1>
-                {contactDetails.length > 0 && (
-                  <div className={tpl.contactClass}>
-                    {contactDetails.map((detail, idx) => (
-                      <React.Fragment key={idx}>
-                        {idx > 0 && <span className="opacity-40">|</span>}
-                        <span>{detail}</span>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                )}
-                {socialLinks.length > 0 && (
-                  <div className={`${tpl.contactClass} mt-1 items-center gap-2`}>
-                    {socialLinks.reduce((acc, link, idx) => {
-                      if (idx > 0) acc.push(<span key={`sep-${idx}`} className="opacity-40">|</span>);
-                      acc.push(link);
+                {headerItems.length > 0 && (
+                  <div className={`${tpl.contactClass} justify-center items-center flex-wrap`}>
+                    {headerItems.reduce((acc, item, idx) => {
+                      if (idx > 0) acc.push(<span key={`sep-${idx}`} className="opacity-40 select-none">|</span>);
+                      acc.push(item);
                       return acc;
                     }, [])}
                   </div>
@@ -750,7 +888,9 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
             node: (
               <section className="text-left">
                 <h3 className={tpl.sectionHeader}>TECHNICAL SKILLS</h3>
-                <p className="text-xs text-slate-800 text-left">{filteredSkills.join(", ")}</p>
+                <p className="text-xs text-slate-800 text-left">
+                  {filteredSkills.join(", ")}
+                </p>
               </section>
             ),
           });
@@ -1039,8 +1179,9 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
     };
 
     const hidden = hiddenSections || [];
-    sectionOrder.forEach(secKey => {
-      if (hidden.includes(secKey)) return;
+    sectionOrder.forEach(rawSecKey => {
+      const secKey = rawSecKey === "responsibilities" ? "responsibility" : rawSecKey;
+      if (hidden.includes(rawSecKey) || hidden.includes(secKey)) return;
       if (sectionBuilders[secKey]) {
         sectionBuilders[secKey]();
       }
@@ -1145,13 +1286,16 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
         import("jspdf"),
       ]);
 
-      // Wait for ALL fonts to finish loading before capturing
+      // Wait for fonts to finish loading with a max timeout of 1 second
       setDownloadStatus("rendering");
       if (document.fonts && document.fonts.ready) {
-        await document.fonts.ready;
+        await Promise.race([
+          document.fonts.ready,
+          new Promise((resolve) => setTimeout(resolve, 1000))
+        ]);
       }
       // Extra buffer for browser to finish paint after fonts loaded
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       const pdf = new jsPDF({
         unit: "mm",
@@ -1163,25 +1307,47 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
       for (let pageIndex = 0; pageIndex < pageElements.length; pageIndex += 1) {
         const pageElement = pageElements[pageIndex];
 
+        // Safe and clean html2canvas configuration with scroll reset
         const canvas = await html2canvas(pageElement, {
-          scale: 3,
+          scale: 1.2,
           useCORS: true,
           allowTaint: false,
           backgroundColor: "#ffffff",
           logging: false,
-          // Let html2canvas measure the element itself — no x/y offset
-          windowWidth: pageElement.scrollWidth,
-          windowHeight: pageElement.scrollHeight,
+          scrollY: 0,
+          scrollX: 0,
         });
 
-        // PNG = lossless, crisp text, no JPEG artifacts
-        const imageData = canvas.toDataURL("image/png");
+        const imageData = canvas.toDataURL("image/jpeg", 0.70);
 
         if (pageIndex > 0) {
           pdf.addPage();
         }
 
-        pdf.addImage(imageData, "PNG", 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, "NONE");
+        // Draw image first
+        pdf.addImage(imageData, "JPEG", 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, "FAST");
+
+        // Add invisible text layer on top of the image for perfect ATS parsing & selectability
+        pdf.setFont("Helvetica");
+        pdf.setFontSize(9);
+        
+        let textY = 15;
+        const pageBlockIndexes = (previewPages && previewPages[pageIndex]) || [];
+        pageBlockIndexes.forEach(blockIdx => {
+          const block = contentBlocks[blockIdx];
+          if (block) {
+            const lines = getBlockText(block.key, resumeData);
+            lines.forEach(line => {
+              if (line && typeof line === 'string' && line.trim()) {
+                pdf.text(line, 12, textY, { renderingMode: "invisible" });
+                textY += 5;
+                if (textY > A4_HEIGHT_MM - 15) {
+                  textY = 15;
+                }
+              }
+            });
+          }
+        });
       }
 
       setDownloadStatus("saving");
@@ -1223,21 +1389,41 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
     };
 
     // ── Header ──
-    const contactParts = [personal.email, personal.phone, personal.location].filter(Boolean);
-    const socialParts = [
-      personal.linkedin ? `<a href="${personal.linkedin}">LinkedIn</a>` : "",
-      personal.github ? `<a href="${personal.github}">GitHub</a>` : "",
-      personal.portfolio ? `<a href="${personal.portfolio}">Portfolio</a>` : "",
-      personal.leetcode ? `<a href="${personal.leetcode}">LeetCode</a>` : "",
-    ].filter(Boolean);
+    const cleanUrl = (url) => {
+      if (!url) return "";
+      return url.replace(/https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+    };
+
+    const headerParts = [];
+    if (personal.phone) headerParts.push(personal.phone);
+    if (personal.email) headerParts.push(`<a href="mailto:${personal.email}">${personal.email}</a>`);
+    if (personal.location && template !== "minimalist" && template !== "executive") {
+      headerParts.push(personal.location);
+    }
+    if (personal.linkedin) {
+      const url = personal.linkedin.startsWith("http") ? personal.linkedin : `https://${personal.linkedin}`;
+      headerParts.push(`<a href="${url}">${cleanUrl(personal.linkedin)}</a>`);
+    }
+    if (personal.github) {
+      const url = personal.github.startsWith("http") ? personal.github : `https://${personal.github}`;
+      headerParts.push(`<a href="${url}">${cleanUrl(personal.github)}</a>`);
+    }
+    if (personal.leetcode) {
+      const url = personal.leetcode.startsWith("http") ? personal.leetcode : `https://${personal.leetcode}`;
+      headerParts.push(`<a href="${url}">${cleanUrl(personal.leetcode)}</a>`);
+    }
+    if (personal.portfolio) {
+      const url = personal.portfolio.startsWith("http") ? personal.portfolio : `https://${personal.portfolio}`;
+      headerParts.push(`<a href="${url}">${cleanUrl(personal.portfolio)}</a>`);
+    }
 
     // ── Skills ──
     let skillsHtml = "";
     if (showGroupedSkills && groupedSkills?.length > 0) {
-      skillsHtml = groupedSkills.map((g) => `<div class="skill-group"><strong>${g.label}:</strong> ${g.skills.join(", ")}</div>`).join("");
+      skillsHtml = groupedSkills.map((g) => `<div class="skill-group"><strong>${g.category}:</strong> ${g.items.join(", ")}</div>`).join("");
     } else {
       const flat = skills.filter(Boolean);
-      if (flat.length) skillsHtml = `<p>${flat.join(" · ")}</p>`;
+      if (flat.length) skillsHtml = `<p class="skill-flat">${flat.join(" · ")}</p>`;
     }
 
     // ── Education ──
@@ -1336,6 +1522,7 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
       certificate: certHtml ? `<section><h2>CERTIFICATIONS</h2>${certHtml}</section>` : "",
       publication: pubHtml ? `<section><h2>PUBLICATIONS</h2>${pubHtml}</section>` : "",
       responsibility: respHtml ? `<section><h2>RESPONSIBILITIES</h2>${respHtml}</section>` : "",
+      responsibilities: respHtml ? `<section><h2>RESPONSIBILITIES</h2>${respHtml}</section>` : "",
     };
 
     const bodySections = sectionOrder
@@ -1367,7 +1554,7 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
     text-align: center;
     margin-bottom: 12pt;
     padding-bottom: 8pt;
-    border-bottom: 1.5px solid #222;
+    border-bottom: 0.75pt solid #000;
   }
   header h1 {
     font-size: 20pt;
@@ -1391,9 +1578,9 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    border-bottom: 1px solid #111;
-    padding-bottom: 2pt;
-    margin-bottom: 5pt;
+    border-bottom: 0.5pt solid #000;
+    padding-bottom: 4pt;
+    margin-bottom: 3pt;
   }
 
   /* Entries */
@@ -1415,13 +1602,14 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
   li { font-size: 9pt; margin-bottom: 2pt; }
 
   /* Skills */
-  .skill-group { font-size: 9pt; margin-bottom: 3pt; }
+  .skill-group { font-size: 9pt; margin-bottom: 4pt; padding-left: 0; }
+  .skill-flat { font-size: 9.5pt; padding-left: 0; }
   p { font-size: 9.5pt; }
 
   /* Print */
   @media print {
     @page { margin: 0.65in 0.7in; size: A4; }
-    body { padding: 0; }
+    body { padding: 0 !important; margin: 0 !important; max-width: 100% !important; width: 100% !important; }
     a { color: inherit !important; text-decoration: underline; }
     section { page-break-inside: avoid; }
   }
@@ -1430,35 +1618,53 @@ function Preview({ resumeData, resumeName, layoutSettings }) {
 <body>
 <header>
   <h1>${personal.fullName || ""}</h1>
-  <div class="contact-line">${contactParts.join(" &nbsp;|&nbsp; ")}</div>
-  ${socialParts.length ? `<div class="contact-line">${socialParts.join(" &nbsp;|&nbsp; ")}</div>` : ""}
+  <div class="contact-line">${headerParts.join(" &nbsp;|&nbsp; ")}</div>
 </header>
 
 ${bodySections}
 </body>
 </html>`;
 
-    // Use Blob URL — avoids popup blockers on document.write and is more reliable
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const blobUrl = URL.createObjectURL(blob);
+    // Create a hidden iframe to trigger browser printing safely without popup blocking
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.zIndex = "-9999";
+    document.body.appendChild(iframe);
 
-    const printWindow = window.open(blobUrl, "_blank");
-    if (!printWindow) {
-      alert("Pop-up blocked. Please allow pop-ups for this site and try again.");
-      URL.revokeObjectURL(blobUrl);
-      return;
-    }
+    try {
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(html);
+      doc.close();
 
-    // Wait for the page to fully load then trigger print
-    printWindow.addEventListener("load", () => {
-      // Give browser time to render layout before print dialog
+      // Trigger print after rendering delay
       setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        // Clean up blob URL after a delay
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
-      }, 600);
-    });
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        
+        // Clean up the iframe after print is closed
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 5000);
+      }, 500);
+    } catch (e) {
+      console.error("Iframe print initialization failed:", e);
+      // Fallback: download as text file if print fails
+      const element = document.createElement("a");
+      const file = new Blob([html], {type: 'text/html'});
+      element.href = URL.createObjectURL(file);
+      element.download = `${(resumeName || "resume").replace(/\s+/g, "_")}_ats.html`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    }
   };
 
 

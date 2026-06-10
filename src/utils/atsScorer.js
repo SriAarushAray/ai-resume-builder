@@ -1,4 +1,4 @@
-// ATS Resume Scorer Utility
+// ATS Resume Scorer Utility mimicking Enhancv scoring criteria
 
 const ACTION_VERBS = [
   "developed", "built", "optimized", "led", "designed", "implemented", "created",
@@ -7,9 +7,74 @@ const ACTION_VERBS = [
   "integrated", "pioneered", "championed", "orchestrated", "facilitated", "authored"
 ];
 
+const STOPWORDS = [
+  "the", "and", "a", "an", "to", "in", "for", "of", "with", "at", "by", "on", "or", "as",
+  "is", "are", "was", "were", "that", "this", "these", "it", "its", "from", "using", "into",
+  "various", "our", "their", "about", "also", "who", "which", "which", "been"
+];
+
+const TECH_TYPOS = {
+  "reactjs": "React",
+  "nodejs": "Node.js",
+  "javascript": "JavaScript",
+  "typescript": "TypeScript",
+  "postgresql": "PostgreSQL",
+  "mongodb": "MongoDB",
+  "html": "HTML",
+  "css": "CSS",
+  "github": "GitHub",
+  "linkedin": "LinkedIn",
+  "mysql": "MySQL",
+  "aws": "AWS",
+  "api": "API",
+  "apis": "APIs"
+};
+
 function countWords(str) {
   if (!str) return 0;
   return str.trim().split(/\s+/).filter(Boolean).length;
+}
+
+// Gathers text segments with metadata to execute granular, context-aware checking
+function extractTextBlocks(resumeData) {
+  const personal = resumeData.personal || {};
+  const experiences = resumeData.experiences || [];
+  const projects = resumeData.projects || [];
+  
+  const blocks = [];
+  if (personal.summary && personal.summary.trim()) {
+    blocks.push({ type: "summary", text: personal.summary, label: "Professional Summary" });
+  }
+  
+  experiences.forEach((exp, idx) => {
+    const company = exp.company?.trim() || `Company #${idx + 1}`;
+    if (exp.description && exp.description.trim()) {
+      blocks.push({ type: "experience", text: exp.description, label: `${company} description` });
+    }
+    if (Array.isArray(exp.points)) {
+      exp.points.forEach((pt) => {
+        if (pt && pt.trim()) {
+          blocks.push({ type: "experience", text: pt, label: company });
+        }
+      });
+    }
+  });
+
+  projects.forEach((proj, idx) => {
+    const title = proj.title?.trim() || `Project #${idx + 1}`;
+    if (proj.description && proj.description.trim()) {
+      blocks.push({ type: "project", text: proj.description, label: `${title} description` });
+    }
+    if (Array.isArray(proj.points)) {
+      proj.points.forEach((pt) => {
+        if (pt && pt.trim()) {
+          blocks.push({ type: "project", text: pt, label: title });
+        }
+      });
+    }
+  });
+  
+  return blocks;
 }
 
 export function calculateAtsScore(resumeData) {
@@ -19,134 +84,108 @@ export function calculateAtsScore(resumeData) {
   const skills = resumeData.skills || [];
   const education = resumeData.education || {};
   const experiences = resumeData.experiences || [];
-  const projects = resumeData.projects || [];
 
-  let score = 0;
+  let contentScore = 100;
+  let sectionsScore = 0;
+  let essentialsScore = 0;
 
-  // 1. Section Completeness (max 40 pts)
-  // Personal Info (10 pts total)
-  if (personal.fullName) score += 2.5;
-  if (personal.email) score += 2.5;
-  if (personal.phone) score += 2.5;
-  if (personal.location) score += 2.5;
+  const textBlocks = extractTextBlocks(resumeData);
 
-  // Professional Summary (5 pts)
-  if (personal.summary && personal.summary.trim().length > 10) score += 5;
-
-  // Skills (10 pts)
-  if (skills.length > 0) score += 10;
-
-  // Education (5 pts)
-  if (education.college && education.degree) score += 5;
-
-  // Experience (5 pts)
-  if (experiences.length > 0) score += 5;
-
-  // Projects (5 pts)
-  if (projects.length > 0) score += 5;
-
-  // 2. Content Quality & Metrics (max 40 pts)
-  // Word Count (15 pts)
-  let wordCount = 0;
-  wordCount += countWords(personal.summary);
-  experiences.forEach(e => {
-    wordCount += countWords(e.description);
-    if (Array.isArray(e.points)) {
-      e.points.forEach(p => { wordCount += countWords(p); });
+  // ─── 1. CONTENT SCORE (40% weight) ───
+  
+  // A. Quantifying Impact (50 pts of Content)
+  let nonQuantifiedCount = 0;
+  let experienceBulletCount = 0;
+  
+  textBlocks.forEach(block => {
+    if (block.type === "experience" || block.type === "project") {
+      experienceBulletCount++;
+      const hasMetric = /%|\$\d|\d+\+?|\d+\s*(?:percent|users|visitors|hours|months|years|credits|points)/i.test(block.text);
+      if (!hasMetric) {
+        nonQuantifiedCount++;
+      }
     }
   });
-  projects.forEach(p => {
-    wordCount += countWords(p.description);
-    if (Array.isArray(p.points)) {
-      p.points.forEach(pt => { wordCount += countWords(pt); });
-    }
-  });
-
-  if (wordCount >= 400 && wordCount <= 650) {
-    score += 15;
-  } else if (wordCount >= 250 && wordCount < 400) {
-    score += 10;
-  } else if (wordCount > 650) {
-    score += 8; // Too wordy
-  } else if (wordCount > 0 && wordCount < 250) {
-    score += 5; // Too brief
+  
+  let impactDeduction = 0;
+  if (experienceBulletCount > 0) {
+    impactDeduction = Math.min(50, (nonQuantifiedCount / experienceBulletCount) * 50);
+  } else {
+    impactDeduction = 25; // fallback penalty if no items exist
   }
 
-  // Action Verbs (15 pts)
-  let verbCount = 0;
-  const uniqueVerbs = new Set();
-  const checkVerbs = (text) => {
-    if (!text) return;
-    const words = text.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/);
+  // B. Repetition (30 pts of Content)
+  const wordCounts = {};
+  textBlocks.forEach(block => {
+    const words = block.text.toLowerCase().replace(/[^a-z\s-]/g, "").split(/\s+/);
     words.forEach(w => {
-      if (ACTION_VERBS.includes(w)) {
-        uniqueVerbs.add(w);
+      if (w.length < 3 || STOPWORDS.includes(w)) return;
+      wordCounts[w] = (wordCounts[w] || 0) + 1;
+    });
+  });
+  const repeatedWordsCount = Object.values(wordCounts).filter(c => c >= 4).length;
+  const repetitionDeduction = Math.min(30, repeatedWordsCount * 10);
+
+  // C. Spelling & Grammar (20 pts of Content)
+  let spellingErrorsCount = 0;
+  const checkedTech = new Set();
+  textBlocks.forEach(block => {
+    if (block.text.includes("  ")) spellingErrorsCount++;
+    const doubleWordRegex = /\b(\w+)\s+\1\b/gi;
+    if (doubleWordRegex.test(block.text)) spellingErrorsCount++;
+    
+    const words = block.text.split(/[\s,./()]+/).filter(Boolean);
+    words.forEach(w => {
+      const lower = w.toLowerCase();
+      if (TECH_TYPOS[lower] && TECH_TYPOS[lower] !== w && !checkedTech.has(lower)) {
+        spellingErrorsCount++;
+        checkedTech.add(lower);
       }
     });
-  };
-
-  experiences.forEach(e => {
-    checkVerbs(e.description);
-    if (Array.isArray(e.points)) {
-      e.points.forEach(p => checkVerbs(p));
-    }
   });
-  projects.forEach(p => {
-    checkVerbs(p.description);
-    if (Array.isArray(p.points)) {
-      p.points.forEach(pt => checkVerbs(pt));
-    }
+  const spellingDeduction = Math.min(20, spellingErrorsCount * 10);
+
+  contentScore = Math.max(0, 100 - impactDeduction - repetitionDeduction - spellingDeduction);
+
+  // ─── 2. SECTIONS SCORE (30% weight) ───
+  let sectionsCount = 0;
+  const maxSections = 5;
+  
+  if (personal.fullName && personal.email && personal.phone && personal.location) sectionsCount++;
+  if (personal.summary && personal.summary.trim().length > 15) sectionsCount++;
+  if (skills.length >= 5) sectionsCount++;
+  if (education.college && education.degree) sectionsCount++;
+  if (experiences.length > 0) sectionsCount++;
+
+  sectionsScore = (sectionsCount / maxSections) * 100;
+
+  // ─── 3. ATS ESSENTIALS SCORE (30% weight) ───
+  let essentialsCount = 0;
+  const maxEssentials = 4;
+
+  // Social Links
+  if (personal.linkedin && (personal.github || personal.portfolio)) essentialsCount++;
+  
+  // Word Count Range (300 to 700 words is standard for 1 page)
+  let wordCount = 0;
+  textBlocks.forEach(b => {
+    wordCount += b.text.trim().split(/\s+/).filter(Boolean).length;
   });
+  if (wordCount >= 250 && wordCount <= 750) essentialsCount++;
 
-  verbCount = uniqueVerbs.size;
-  if (verbCount >= 5) {
-    score += 15;
-  } else if (verbCount >= 2) {
-    score += 10;
-  } else if (verbCount === 1) {
-    score += 5;
-  }
-
-  // Quantitative Metrics (10 pts)
-  let metricCount = 0;
-  const checkMetrics = (text) => {
-    if (!text) return false;
-    // Match percentages, currency, or clear digits like 10+, 100
-    return /%|\$\d|\d+\+?|\d+\s*(?:percent|users|visitors|hours|months|years|credits)/i.test(text);
-  };
-
-  let hasMetrics = 0;
-  experiences.forEach(e => {
-    if (Array.isArray(e.points)) {
-      e.points.forEach(p => { if (checkMetrics(p)) hasMetrics++; });
-    }
-  });
-  projects.forEach(p => {
-    if (Array.isArray(p.points)) {
-      p.points.forEach(pt => { if (checkMetrics(pt)) hasMetrics++; });
-    }
-  });
-
-  if (hasMetrics >= 3) {
-    score += 10;
-  } else if (hasMetrics >= 1) {
-    score += 5;
-  }
-
-  // 3. Format & Spacing (max 20 pts)
-  // Font Size (5 pts)
+  // Font size settings
   const fontSize = parseInt(resumeData.fontSettings?.size || "10", 10);
-  if (fontSize >= 9 && fontSize <= 12) score += 5;
+  if (fontSize >= 9 && fontSize <= 12) essentialsCount++;
 
-  // Spacing (5 pts)
+  // Line spacing
   const lineSpacing = resumeData.layoutSettings?.lineSpacing ?? 4;
-  if (lineSpacing >= 2 && lineSpacing <= 8) score += 5;
+  if (lineSpacing >= 2 && lineSpacing <= 8) essentialsCount++;
 
-  // Social Links (10 pts)
-  if (personal.linkedin) score += 5;
-  if (personal.github || personal.portfolio) score += 5;
+  essentialsScore = (essentialsCount / maxEssentials) * 100;
 
-  return Math.min(100, Math.round(score));
+  const totalScore = (contentScore * 0.4) + (sectionsScore * 0.3) + (essentialsScore * 0.3);
+
+  return Math.min(100, Math.round(totalScore));
 }
 
 export function getAtsSuggestions(resumeData) {
@@ -159,225 +198,285 @@ export function getAtsSuggestions(resumeData) {
   const projects = resumeData.projects || [];
 
   const suggestions = [];
+  const textBlocks = extractTextBlocks(resumeData);
 
-  // Contact Info
+  // ─── 1. CONTENT SUGGESTIONS ───
+
+  // A. Quantifying Impact Check
+  const nonQuantifiedBlocks = [];
+  textBlocks.forEach(block => {
+    if (block.type === "experience" || block.type === "project") {
+      const hasMetric = /%|\$\d|\d+\+?|\d+\s*(?:percent|users|visitors|hours|months|years|credits|points)/i.test(block.text);
+      if (!hasMetric) {
+        nonQuantifiedBlocks.push(block);
+      }
+    }
+  });
+
+  if (nonQuantifiedBlocks.length > 0) {
+    nonQuantifiedBlocks.slice(0, 2).forEach((block, idx) => {
+      const truncated = block.text.length > 50 ? block.text.substring(0, 47) + "..." : block.text;
+      suggestions.push({
+        id: `quantify_impact_${idx}`,
+        text: `Under "${block.label}", bullet point lacks metrics: "${truncated}". Add a number, percent (%), or dollar value to prove impact.`,
+        impact: "High",
+        type: "Content"
+      });
+    });
+    if (nonQuantifiedBlocks.length > 2) {
+      suggestions.push({
+        id: `quantify_impact_more`,
+        text: `And ${nonQuantifiedBlocks.length - 2} other bullet point(s) lack quantifiable achievements. Check your Experience section.`,
+        impact: "Medium",
+        type: "Content"
+      });
+    }
+  }
+
+  // B. Repetition Check
+  const wordCounts = {};
+  textBlocks.forEach(block => {
+    const words = block.text.toLowerCase().replace(/[^a-z\s-]/g, "").split(/\s+/);
+    words.forEach(w => {
+      if (w.length < 3 || STOPWORDS.includes(w)) return;
+      wordCounts[w] = (wordCounts[w] || 0) + 1;
+    });
+  });
+  
+  const repeatedWords = Object.entries(wordCounts)
+    .filter(([_, count]) => count >= 4)
+    .sort((a, b) => b[1] - a[1]);
+    
+  if (repeatedWords.length > 0) {
+    repeatedWords.slice(0, 2).forEach(([word, count]) => {
+      suggestions.push({
+        id: `repetition_${word}`,
+        text: `The word "${word}" is repeated ${count} times. Vary your vocabulary with synonyms (e.g. built, engineered, orchestrated).`,
+        impact: "Low",
+        type: "Content"
+      });
+    });
+  }
+
+  // C. Spelling, Capitalization & Typos Check
+  const doubleWordTypos = [];
+  const techCapitalTypos = [];
+  let hasDoubleSpaces = false;
+
+  textBlocks.forEach(block => {
+    if (block.text.includes("  ")) {
+      hasDoubleSpaces = true;
+    }
+    const doubleWordRegex = /\b(\w+)\s+\1\b/gi;
+    let match;
+    while ((match = doubleWordRegex.exec(block.text)) !== null) {
+      doubleWordTypos.push(`"${match[0]}"`);
+    }
+    
+    const words = block.text.split(/[\s,./()]+/).filter(Boolean);
+    words.forEach(w => {
+      const lower = w.toLowerCase();
+      if (TECH_TYPOS[lower] && TECH_TYPOS[lower] !== w) {
+        techCapitalTypos.push(`"${w}" (should be "${TECH_TYPOS[lower]}")`);
+      }
+    });
+  });
+
+  if (hasDoubleSpaces) {
+    suggestions.push({
+      id: "spelling_double_spaces",
+      text: "Remove double spaces found in your descriptions to maintain clean spacing.",
+      impact: "Low",
+      type: "Content"
+    });
+  }
+  if (doubleWordTypos.length > 0) {
+    suggestions.push({
+      id: "spelling_double_words",
+      text: `Remove duplicated adjacent words: ${Array.from(new Set(doubleWordTypos)).slice(0, 2).join(", ")}.`,
+      impact: "High",
+      type: "Content"
+    });
+  }
+  if (techCapitalTypos.length > 0) {
+    const uniqueCapitalTypos = Array.from(new Set(techCapitalTypos));
+    suggestions.push({
+      id: "spelling_tech_capitalization",
+      text: `Use standard capitalization: ${uniqueCapitalTypos.slice(0, 3).join(", ")}.`,
+      impact: "Medium",
+      type: "Content"
+    });
+  }
+
+  // ─── 2. SECTIONS SUGGESTIONS (ESSENTIALS) ───
   if (!personal.fullName) {
     suggestions.push({
-      id: "name",
-      text: "Add your full name in the Personal Information section.",
+      id: "sec_name",
+      text: "Essential Section missing: Your full name.",
       impact: "High",
-      type: "Missing Info"
+      type: "Sections"
     });
   }
   if (!personal.email) {
     suggestions.push({
-      id: "email",
-      text: "Provide a valid email address.",
+      id: "sec_email",
+      text: "Essential Section missing: A professional email address.",
       impact: "High",
-      type: "Missing Info"
+      type: "Sections"
     });
+  } else {
+    const unprofessionalKeywords = ["cool", "sexy", "gamer", "boy", "girl", "love", "king", "queen", "boss", "devil", "angel", "sweet", "hot", "cute", "magic", "rockstar", "ninja", "hacker"];
+    const lowerEmail = personal.email.toLowerCase();
+    const hasUnprofessionalWord = unprofessionalKeywords.some(keyword => lowerEmail.includes(keyword));
+    if (hasUnprofessionalWord) {
+      suggestions.push({
+        id: "ess_email_professional",
+        text: `Your email address "${personal.email}" contains informal/slang keywords. We recommend using a clean, name-based email address.`,
+        impact: "Medium",
+        type: "ATS Essentials"
+      });
+    }
   }
-  if (!personal.phone) {
+  if (!personal.phone || !personal.location) {
     suggestions.push({
-      id: "phone",
-      text: "Add a phone number to improve contactability.",
+      id: "sec_contact",
+      text: "Essential Section incomplete: Add both phone number and location.",
       impact: "Medium",
-      type: "Missing Info"
+      type: "Sections"
     });
   }
+  if (!personal.summary || personal.summary.trim().length < 15) {
+    suggestions.push({
+      id: "sec_summary",
+      text: "Essential Section missing: Professional summary profile.",
+      impact: "High",
+      type: "Sections"
+    });
+  }
+  if (skills.length === 0) {
+    suggestions.push({
+      id: "sec_skills",
+      text: "Essential Section missing: Technical skills keywords list.",
+      impact: "High",
+      type: "Sections"
+    });
+  } else if (skills.length < 5) {
+    suggestions.push({
+      id: "sec_skills_low",
+      text: `Skills section is brief (${skills.length} added). Add at least 5 relevant keywords.`,
+      impact: "Medium",
+      type: "Sections"
+    });
+  }
+  if (!education.college || !education.degree) {
+    suggestions.push({
+      id: "sec_education",
+      text: "Essential Section missing: College/Institution degree.",
+      impact: "High",
+      type: "Sections"
+    });
+  }
+  if (experiences.length === 0) {
+    suggestions.push({
+      id: "sec_experience",
+      text: "Essential Section missing: Professional Work Experience history.",
+      impact: "High",
+      type: "Sections"
+    });
+  }
+
+  // ─── 3. ATS ESSENTIALS SUGGESTIONS ───
   if (!personal.linkedin) {
     suggestions.push({
-      id: "linkedin",
-      text: "Include your LinkedIn URL for recruiters to review your profile.",
+      id: "ess_linkedin",
+      text: "Include your LinkedIn URL in the header for quick online profiles review.",
       impact: "Medium",
-      type: "Social Links"
+      type: "ATS Essentials"
     });
   }
   if (!personal.github && !personal.portfolio) {
     suggestions.push({
-      id: "portfolio",
-      text: "Add a GitHub or Portfolio URL to showcase project code and live samples.",
+      id: "ess_portfolio",
+      text: "Provide a GitHub or Portfolio URL to showcase project code and live samples.",
       impact: "Medium",
-      type: "Social Links"
+      type: "ATS Essentials"
     });
   }
 
-  // Summary
-  if (!personal.summary || personal.summary.trim().length < 10) {
-    suggestions.push({
-      id: "summary",
-      text: "Draft a Professional Summary to introduce your background and goals.",
-      impact: "High",
-      type: "Content Quality"
-    });
-  } else {
-    const summaryWords = countWords(personal.summary);
-    if (summaryWords < 20) {
+  // Full URL checks for links in the header
+  const checkFullLink = (url, name) => {
+    if (url && !url.startsWith("http://") && !url.startsWith("https://")) {
       suggestions.push({
-        id: "summary_short",
-        text: "Your professional summary is a bit short. Expand it to 2-3 sentences.",
-        impact: "Low",
-        type: "Content Quality"
-      });
-    } else if (summaryWords > 70) {
-      suggestions.push({
-        id: "summary_long",
-        text: "Your professional summary is too long. Keep it under 60 words for quick scanning.",
-        impact: "Low",
-        type: "Content Quality"
+        id: `ess_fulllink_${name.toLowerCase()}`,
+        text: `Use a complete URL for your ${name} link (starting with https://). This ensures proper recognition by ATS systems.`,
+        impact: "Medium",
+        type: "ATS Essentials"
       });
     }
-  }
+  };
+  if (personal.linkedin) checkFullLink(personal.linkedin, "LinkedIn");
+  if (personal.github) checkFullLink(personal.github, "GitHub");
+  if (personal.portfolio) checkFullLink(personal.portfolio, "Portfolio");
 
-  // Skills
-  if (skills.length === 0) {
-    suggestions.push({
-      id: "skills",
-      text: "List at least 5 key technical skills to help parse ATS keywords.",
-      impact: "High",
-      type: "Missing Info"
-    });
-  } else if (skills.length < 5) {
-    suggestions.push({
-      id: "skills_low",
-      text: "Add more skills (recommend at least 5-8 relevant technical keywords).",
-      impact: "Medium",
-      type: "Content Quality"
-    });
-  }
-
-  // Education
-  if (!education.college || !education.degree) {
-    suggestions.push({
-      id: "education",
-      text: "Provide your education history (college/school and degree).",
-      impact: "High",
-      type: "Missing Info"
-    });
-  }
-
-  // Experience
-  if (experiences.length === 0) {
-    suggestions.push({
-      id: "experience",
-      text: "Add at least one professional or student work experience.",
-      impact: "High",
-      type: "Missing Info"
-    });
-  } else {
-    // Check points
-    let totalPoints = 0;
-    let hasEmptyPoints = false;
-    experiences.forEach(e => {
-      if (Array.isArray(e.points)) {
-        totalPoints += e.points.filter(p => p.trim()).length;
-      }
-    });
-
-    if (totalPoints === 0) {
-      suggestions.push({
-        id: "experience_points",
-        text: "Add bullet points to describe achievements at your job roles.",
-        impact: "High",
-        type: "Missing Info"
-      });
-    }
-
-    // Check action verbs
-    let uniqueVerbsCount = 0;
-    const uniqueVerbs = new Set();
-    const checkVerbs = (text) => {
-      if (!text) return;
-      const words = text.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/);
-      words.forEach(w => {
-        if (ACTION_VERBS.includes(w)) uniqueVerbs.add(w);
-      });
-    };
-    experiences.forEach(e => {
-      checkVerbs(e.description);
-      if (Array.isArray(e.points)) e.points.forEach(p => checkVerbs(p));
-    });
-    projects.forEach(p => {
-      checkVerbs(p.description);
-      if (Array.isArray(p.points)) p.points.forEach(pt => checkVerbs(pt));
-    });
-
-    uniqueVerbsCount = uniqueVerbs.size;
-    if (uniqueVerbsCount < 3 && totalPoints > 0) {
-      suggestions.push({
-        id: "action_verbs",
-        text: "Use more strong action verbs (e.g. Developed, Optimized, Led) to start your points.",
-        impact: "High",
-        type: "Content Quality"
-      });
-    }
-
-    // Check metrics
-    const checkMetrics = (text) => {
-      if (!text) return false;
-      return /%|\$\d|\d+\+?|\d+\s*(?:percent|users|visitors|hours|months|years|credits)/i.test(text);
-    };
-    let hasMetricsCount = 0;
-    experiences.forEach(e => {
-      if (Array.isArray(e.points)) {
-        e.points.forEach(p => { if (checkMetrics(p)) hasMetricsCount++; });
-      }
-    });
-    projects.forEach(p => {
-      if (Array.isArray(p.points)) {
-        p.points.forEach(pt => { if (checkMetrics(pt)) hasMetricsCount++; });
-      }
-    });
-
-    if (hasMetricsCount === 0 && totalPoints > 0) {
-      suggestions.push({
-        id: "metrics",
-        text: "Incorporate metrics (e.g. percentage improvements, dollar values) to prove impact.",
-        impact: "High",
-        type: "Content Quality"
-      });
-    }
-  }
-
-  // Projects
-  if (projects.length === 0) {
-    suggestions.push({
-      id: "projects",
-      text: "Add 1-2 personal or academic projects to show hands-on experience.",
-      impact: "Medium",
-      type: "Missing Info"
-    });
-  }
-
-  // Word Count
+  // Word Count Range
   let wordCount = 0;
-  wordCount += countWords(personal.summary);
-  experiences.forEach(e => {
-    wordCount += countWords(e.description);
-    if (Array.isArray(e.points)) {
-      e.points.forEach(p => { wordCount += countWords(p); });
-    }
+  textBlocks.forEach(b => {
+    wordCount += b.text.trim().split(/\s+/).filter(Boolean).length;
   });
-  projects.forEach(p => {
-    wordCount += countWords(p.description);
-    if (Array.isArray(p.points)) {
-      p.points.forEach(pt => { wordCount += countWords(pt); });
-    }
-  });
-
-  if (wordCount > 0 && wordCount < 200) {
+  if (wordCount > 0 && wordCount < 250) {
     suggestions.push({
-      id: "word_count_short",
-      text: "Expand your resume's descriptions; it is currently too short for an ATS scan (aim for >300 words).",
+      id: "ess_wordcount_short",
+      text: `Word count is low (${wordCount} words). Expand descriptions to feed ATS keywords (>250).`,
       impact: "High",
-      type: "Length"
+      type: "ATS Essentials"
     });
   } else if (wordCount > 750) {
     suggestions.push({
-      id: "word_count_long",
-      text: "Condense your resume; word count is over 750 words, which may spill over A4 margins.",
+      id: "ess_wordcount_long",
+      text: `Word count is high (${wordCount} words). Condense bullet points to fit A4 layout (<750).`,
       impact: "Medium",
-      type: "Length"
+      type: "ATS Essentials"
+    });
+  }
+
+  // Font size
+  const fontSize = parseInt(resumeData.fontSettings?.size || "10", 10);
+  if (fontSize < 9 || fontSize > 12) {
+    suggestions.push({
+      id: "ess_fontsize",
+      text: `Adjust font size settings (current: ${fontSize}pt). Standard range is 9pt to 12pt.`,
+      impact: "Low",
+      type: "ATS Essentials"
+    });
+  }
+
+  // Spacing
+  const lineSpacing = resumeData.layoutSettings?.lineSpacing ?? 4;
+  if (lineSpacing < 2 || lineSpacing > 8) {
+    suggestions.push({
+      id: "ess_linespacing",
+      text: `Line spacing is non-standard (${lineSpacing}px). Set between 2px and 8px.`,
+      impact: "Low",
+      type: "ATS Essentials"
+    });
+  }
+
+  // Suggest action verb variety if they have too few
+  let uniqueVerbsCount = 0;
+  const uniqueVerbs = new Set();
+  textBlocks.forEach(block => {
+    const words = block.text.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/);
+    words.forEach(w => {
+      if (ACTION_VERBS.includes(w)) uniqueVerbs.add(w);
+    });
+  });
+  uniqueVerbsCount = uniqueVerbs.size;
+  if (uniqueVerbsCount < 4 && experiences.length > 0) {
+    suggestions.push({
+      id: "ess_verbs_low",
+      text: "Start more bullet points with action verbs (e.g. Developed, Led, Engineered).",
+      impact: "Medium",
+      type: "ATS Essentials"
     });
   }
 
